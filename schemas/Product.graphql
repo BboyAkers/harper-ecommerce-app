@@ -1,0 +1,42 @@
+type ImageSet {
+	mobile: String
+	tablet: String
+	desktop: String
+}
+
+type IncludedItem {
+	quantity: Int
+	item: String
+}
+
+type Gallery {
+	first: ImageSet
+	second: ImageSet
+	third: ImageSet
+}
+
+type RelatedProduct {
+	slug: String
+	name: String
+	shortName: String
+	image: ImageSet
+}
+
+# Not exported here: extended with public read access in resources/Product.ts.
+type Product @table {
+	id: ID @primaryKey
+	ord: Int
+	slug: String @indexed
+	name: String
+	shortName: String
+	category: String @indexed
+	new: Boolean
+	price: Int
+	description: String
+	features: String
+	includes: [IncludedItem]
+	image: ImageSet
+	categoryImage: ImageSet
+	gallery: Gallery
+	others: [RelatedProduct]
+}

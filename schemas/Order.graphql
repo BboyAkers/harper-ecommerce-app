@@ -1,0 +1,32 @@
+type OrderItem {
+	slug: String
+	name: String
+	price: Int
+	quantity: Int
+	image: String
+}
+
+type OrderCustomer {
+	name: String
+	email: String
+	phone: String
+	address: String
+	zip: String
+	city: String
+	country: String
+}
+
+# Not exported directly: extended with validation and server-side totals
+# in resources/Order.ts.
+type Order @table {
+	id: ID @primaryKey
+	createdAt: Date
+	customer: OrderCustomer
+	paymentMethod: String
+	eMoneyNumber: String
+	items: [OrderItem]
+	total: Float
+	shipping: Float
+	vat: Float
+	grandTotal: Float
+}

@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+
+@theme {
+	--font-sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+
+	--color-primary: #d87d4a;
+	--color-primary-light: #fbaf85;
+	--color-dark: #101010;
+	--color-charcoal: #191919;
+	--color-light: #f1f1f1;
+	--color-off-white: #fafafa;
+	--color-error: #cd2c2c;
+	--color-input-border: #cfcfcf;
+}
+
+@layer base {
+	body {
+		@apply bg-off-white font-sans text-black antialiased;
+	}
+}
+
+@utility container-app {
+	@apply mx-auto w-full max-w-[calc(1110px+3rem)] px-6;
+}
+
+@utility text-overline {
+	@apply text-sm font-normal uppercase tracking-[10px] text-primary;
+}
+
+@utility text-subtitle {
+	@apply text-[13px] font-bold uppercase leading-[25px] tracking-[1px];
+}
+
+@utility text-body {
+	@apply text-[15px] font-medium leading-[25px];
+}

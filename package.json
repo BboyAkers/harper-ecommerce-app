@@ -1,0 +1,46 @@
+{
+	"name": "harper-ecommerce-app",
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"agent:run": "npx -y @harperfast/agent@latest",
+		"agent:skills:update": "npx -y skills@latest add harperfast/skills --all --yes",
+		"start": "harper run .",
+		"dev": "harper dev .",
+		"lint": "eslint .",
+		"format": "prettier --write .",
+		"test": "node --test test/*.test.ts",
+		"test:watch": "node --watch --test test/*.test.ts",
+		"build": "vite build",
+		"deploy": "harper deploy_component . restart=true replicated=true"
+	},
+	"dependencies": {
+		"@harperfast/schema-codegen": "^1.0.10",
+		"@harperfast/vite": "^1.1.0",
+		"@radix-ui/react-dialog": "^1.1.19",
+		"@radix-ui/react-label": "^2.1.11",
+		"@radix-ui/react-radio-group": "^1.4.3",
+		"@radix-ui/react-slot": "^1.3.0",
+		"@tailwindcss/vite": "^4.3.2",
+		"@vitejs/plugin-react": "^6.0.1",
+		"class-variance-authority": "^0.7.1",
+		"clsx": "^2.1.1",
+		"react": "^19.2.4",
+		"react-dom": "^19.2.4",
+		"react-router-dom": "^7.18.1",
+		"tailwind-merge": "^3.6.0",
+		"tailwindcss": "^4.3.2",
+		"tslib": "^2.8.1",
+		"vite": "^8.0.0"
+	},
+	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"@types/node": "^24.10.1",
+		"@types/react": "^19.2.10",
+		"@types/react-dom": "^19.2.3",
+		"eslint": "^10.0.2",
+		"globals": "^17.4.0",
+		"prettier": "^3.8.1",
+		"typescript": "~6.0.0"
+	}
+}
