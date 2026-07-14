@@ -3,6 +3,51 @@
  Manual changes will be lost!
  > harper dev .
  */
+export interface Agent {
+	id: string;
+	brokerage?: string;
+	email?: string;
+	name?: string;
+	phone?: string;
+}
+
+export type NewAgent = Omit<Agent, 'id'>;
+export type { Agent as AgentRecord };
+export type AgentRecords = Agent[];
+export type NewAgentRecord = Omit<Agent, 'id'>;
+
+export interface Listing {
+	id: string;
+	addressLine?: string;
+	agentId?: string;
+	baths?: number;
+	beds?: number;
+	city?: string;
+	createdTime?: number;
+	description?: string;
+	embedding?: number[];
+	features?: string[];
+	geohash?: string;
+	heroPhoto?: any;
+	lat?: number;
+	listPrice?: number;
+	lng?: number;
+	mlsId?: string;
+	photos?: any[];
+	propertyType?: string;
+	sqft?: number;
+	state?: string;
+	status?: string;
+	updatedTime?: number;
+	yearBuilt?: number;
+	zip?: string;
+}
+
+export type NewListing = Omit<Listing, 'id'>;
+export type { Listing as ListingRecord };
+export type ListingRecords = Listing[];
+export type NewListingRecord = Omit<Listing, 'id'>;
+
 export interface Order {
 	id: string;
 	createdAt?: string;
@@ -43,6 +88,19 @@ export type NewProduct = Omit<Product, 'id'>;
 export type { Product as ProductRecord };
 export type ProductRecords = Product[];
 export type NewProductRecord = Omit<Product, 'id'>;
+
+export interface SavedSearch {
+	id: string;
+	createdTime?: number;
+	criteria?: any;
+	label?: string;
+	userId?: string;
+}
+
+export type NewSavedSearch = Omit<SavedSearch, 'id'>;
+export type { SavedSearch as SavedSearchRecord };
+export type SavedSearchRecords = SavedSearch[];
+export type NewSavedSearchRecord = Omit<SavedSearch, 'id'>;
 
 export interface TodoList {
 	id: string;

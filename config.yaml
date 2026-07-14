@@ -43,5 +43,5 @@ jsResource:
 # index.html stays cacheable at a single URL. Do not add a `notFound` + `fallthrough: false`
 # fallback here — the static handler runs before the REST handler, so it would swallow GET
 # requests to your resources.
-# static:
-#   files: 'dist/**'
+static:
+  files: 'dist/**'
