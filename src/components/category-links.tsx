@@ -1,11 +1,11 @@
 import { cn } from '@/lib/utils.ts';
-import { Link } from 'react-router-dom';
+import { Link } from '@tanstack/react-router';
 
 const CATEGORIES = [
 	{ name: 'Headphones', slug: 'headphones', image: '/assets/shared/desktop/image-category-thumbnail-headphones.png' },
 	{ name: 'Speakers', slug: 'speakers', image: '/assets/shared/desktop/image-category-thumbnail-speakers.png' },
 	{ name: 'Earphones', slug: 'earphones', image: '/assets/shared/desktop/image-category-thumbnail-earphones.png' },
-];
+] as const;
 
 export function CategoryLinks({ className, onNavigate }: { className?: string; onNavigate?: () => void }) {
 	return (
@@ -13,7 +13,8 @@ export function CategoryLinks({ className, onNavigate }: { className?: string; o
 			{CATEGORIES.map((category) => (
 				<Link
 					key={category.slug}
-					to={`/category/${category.slug}`}
+					to="/category/$category"
+					params={{ category: category.slug }}
 					onClick={onNavigate}
 					className="group relative mt-[52px] block rounded-lg bg-light px-6 pb-[22px] pt-[88px] text-center"
 				>

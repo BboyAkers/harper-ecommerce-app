@@ -1,16 +1,16 @@
 import { CartDialog } from '@/components/cart-dialog.tsx';
 import { CategoryLinks } from '@/components/category-links.tsx';
 import { NAV_LINKS } from '@/components/nav-links.ts';
+import { Link, useLocation } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
 
 export function Header() {
 	const [menuOpen, setMenuOpen] = useState(false);
-	const location = useLocation();
+	const pathname = useLocation({ select: (location) => location.pathname });
 
 	useEffect(() => {
 		setMenuOpen(false);
-	}, [location]);
+	}, [pathname]);
 
 	return (
 		<header className="sticky top-0 z-30 bg-charcoal text-white">
@@ -33,8 +33,8 @@ export function Header() {
 				<nav className="hidden items-center gap-[34px] lg:flex">
 					{NAV_LINKS.map((link) => (
 						<Link
-							key={link.href}
-							to={link.href}
+							key={link.label}
+							{...link.linkProps}
 							className="text-subtitle tracking-[2px] transition-colors hover:text-primary"
 						>
 							{link.label}

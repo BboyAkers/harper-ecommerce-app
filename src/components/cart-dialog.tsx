@@ -3,8 +3,8 @@ import { Button } from '@/components/ui/button.tsx';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog.tsx';
 import { useCart } from '@/lib/cart.tsx';
 import { formatPrice } from '@/lib/utils.ts';
+import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 export function CartDialog() {
 	const { items, total, totalQuantity, setQuantity, removeAll } = useCart();
@@ -71,7 +71,7 @@ export function CartDialog() {
 							className="mt-6 w-full"
 							onClick={() => {
 								setOpen(false);
-								navigate('/checkout');
+								navigate({ to: '/checkout' });
 							}}
 						>
 							Checkout

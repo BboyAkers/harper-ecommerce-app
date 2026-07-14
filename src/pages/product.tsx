@@ -6,12 +6,14 @@ import { getProduct } from '@/lib/api.ts';
 import { useCart } from '@/lib/cart.tsx';
 import type { Product } from '@/lib/types.ts';
 import { formatPrice } from '@/lib/utils.ts';
+import { getRouteApi, Link, useRouter } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+
+const route = getRouteApi('/product/$slug');
 
 export function ProductPage() {
-	const { slug = '' } = useParams();
-	const navigate = useNavigate();
+	const { slug } = route.useParams();
+	const router = useRouter();
 	const { addItem } = useCart();
 	const [product, setProduct] = useState<Product | undefined>();
 	const [notFound, setNotFound] = useState(false);
@@ -42,7 +44,7 @@ export function ProductPage() {
 			<div className="container-app pt-4 sm:pt-8 lg:pt-20">
 				<button
 					type="button"
-					onClick={() => navigate(-1)}
+					onClick={() => router.history.back()}
 					className="text-body cursor-pointer opacity-50 transition hover:text-primary hover:opacity-100"
 				>
 					Go Back
@@ -129,7 +131,9 @@ export function ProductPage() {
 								</picture>
 								<h3 className="mt-8 text-2xl font-bold uppercase tracking-[1.71px] lg:mt-10">{other.shortName}</h3>
 								<Button asChild className="mt-8">
-									<Link to={`/product/${other.slug}`}>See Product</Link>
+									<Link to="/product/$slug" params={{ slug: other.slug }}>
+										See Product
+									</Link>
 								</Button>
 							</div>
 						))}

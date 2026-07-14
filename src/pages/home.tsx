@@ -1,7 +1,7 @@
 import { BestGear } from '@/components/best-gear.tsx';
 import { CategoryLinks } from '@/components/category-links.tsx';
 import { Button } from '@/components/ui/button.tsx';
-import { Link } from 'react-router-dom';
+import { Link } from '@tanstack/react-router';
 
 export function HomePage() {
 	return (
@@ -28,7 +28,9 @@ export function HomePage() {
 							enthusiast.
 						</p>
 						<Button asChild className="mt-7 lg:mt-10">
-							<Link to="/product/xx99-mark-two-headphones">See Product</Link>
+							<Link to="/product/$slug" params={{ slug: 'xx99-mark-two-headphones' }}>
+								See Product
+							</Link>
 						</Button>
 					</div>
 				</div>
@@ -64,7 +66,9 @@ export function HomePage() {
 								Upgrade to premium speakers that are phenomenally built to deliver truly remarkable sound.
 							</p>
 							<Button asChild variant="dark" className="mt-6 lg:mt-10">
-								<Link to="/product/zx9-speaker">See Product</Link>
+								<Link to="/product/$slug" params={{ slug: 'zx9-speaker' }}>
+									See Product
+								</Link>
 							</Button>
 						</div>
 					</div>
@@ -82,7 +86,9 @@ export function HomePage() {
 					<div className="absolute inset-0 flex flex-col items-start justify-center px-6 sm:px-[62px] lg:px-[95px]">
 						<h2 className="text-[28px] font-bold uppercase tracking-[2px]">ZX7 Speaker</h2>
 						<Button asChild variant="secondary" className="mt-8">
-							<Link to="/product/zx7-speaker">See Product</Link>
+							<Link to="/product/$slug" params={{ slug: 'zx7-speaker' }}>
+								See Product
+							</Link>
 						</Button>
 					</div>
 				</div>
@@ -102,7 +108,9 @@ export function HomePage() {
 				<div className="flex h-[200px] flex-col items-start justify-center rounded-lg bg-light px-6 sm:h-80 sm:px-10 lg:px-[95px]">
 					<h2 className="text-[28px] font-bold uppercase tracking-[2px]">YX1 Earphones</h2>
 					<Button asChild variant="secondary" className="mt-8">
-						<Link to="/product/yx1-earphones">See Product</Link>
+						<Link to="/product/$slug" params={{ slug: 'yx1-earphones' }}>
+							See Product
+						</Link>
 					</Button>
 				</div>
 			</section>
