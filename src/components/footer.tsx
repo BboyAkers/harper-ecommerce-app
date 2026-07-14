@@ -1,5 +1,5 @@
 import { NAV_LINKS } from '@/components/nav-links.ts';
-import { Link } from 'react-router-dom';
+import { Link } from '@tanstack/react-router';
 
 const SOCIALS = [
 	{ name: 'Facebook', icon: '/assets/shared/desktop/icon-facebook.svg', href: 'https://facebook.com' },
@@ -19,8 +19,8 @@ export function Footer() {
 					<nav className="flex flex-col items-center gap-4 sm:flex-row sm:gap-[34px]">
 						{NAV_LINKS.map((link) => (
 							<Link
-								key={link.href}
-								to={link.href}
+								key={link.label}
+								{...link.linkProps}
 								className="text-subtitle tracking-[2px] transition-colors hover:text-primary"
 							>
 								{link.label}

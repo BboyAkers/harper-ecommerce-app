@@ -7,8 +7,8 @@ import { createOrder } from '@/lib/api.ts';
 import { useCart } from '@/lib/cart.tsx';
 import type { OrderConfirmation } from '@/lib/types.ts';
 import { cn, formatPrice } from '@/lib/utils.ts';
+import { Link, useNavigate, useRouter } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 
 const SHIPPING = 50;
 const VAT_RATE = 0.2;
@@ -82,6 +82,7 @@ function Field({
 
 export function CheckoutPage() {
 	const navigate = useNavigate();
+	const router = useRouter();
 	const { items, total, removeAll } = useCart();
 	const [form, setForm] = useState<FormState>(EMPTY_FORM);
 	const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('e-money');
@@ -143,7 +144,7 @@ export function CheckoutPage() {
 			<div className="container-app pt-4 sm:pt-8 lg:pt-20">
 				<button
 					type="button"
-					onClick={() => navigate(-1)}
+					onClick={() => router.history.back()}
 					className="text-body cursor-pointer opacity-50 transition hover:text-primary hover:opacity-100"
 				>
 					Go Back
@@ -286,7 +287,7 @@ export function CheckoutPage() {
 					if (!open) {
 						removeAll();
 						setConfirmation(undefined);
-						navigate('/');
+						navigate({ to: '/' });
 					}
 				}}
 			>
@@ -334,7 +335,7 @@ export function CheckoutPage() {
 								onClick={() => {
 									removeAll();
 									setConfirmation(undefined);
-									navigate('/');
+									navigate({ to: '/' });
 								}}
 							>
 								Back to Home

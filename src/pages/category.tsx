@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button.tsx';
 import { getProductsByCategory } from '@/lib/api.ts';
 import type { Product } from '@/lib/types.ts';
 import { cn } from '@/lib/utils.ts';
+import { getRouteApi, Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+
+const route = getRouteApi('/category/$category');
 
 export function CategoryPage() {
-	const { category = '' } = useParams();
+	const { category } = route.useParams();
 	const [products, setProducts] = useState<Product[] | undefined>();
 	const [error, setError] = useState<string | undefined>();
 
@@ -50,7 +52,9 @@ export function CategoryPage() {
 							</h2>
 							<p className="text-body mt-6 opacity-50 lg:mt-8">{product.description}</p>
 							<Button asChild className="mt-6 lg:mt-10">
-								<Link to={`/product/${product.slug}`}>See Product</Link>
+								<Link to="/product/$slug" params={{ slug: product.slug }}>
+									See Product
+								</Link>
 							</Button>
 						</div>
 					</article>
