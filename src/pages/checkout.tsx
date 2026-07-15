@@ -3,8 +3,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Input } from '@/components/ui/input.tsx';
 import { Label } from '@/components/ui/label.tsx';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group.tsx';
-import { createOrder } from '@/lib/api.ts';
 import { useCart } from '@/lib/cart.tsx';
+import { useCreateOrder } from '@/lib/queries.ts';
 import type { OrderConfirmation } from '@/lib/types.ts';
 import { cn, formatPrice } from '@/lib/utils.ts';
 import { Link, useNavigate, useRouter } from '@tanstack/react-router';
@@ -84,11 +84,10 @@ export function CheckoutPage() {
 	const navigate = useNavigate();
 	const router = useRouter();
 	const { items, total, removeAll } = useCart();
+	const createOrder = useCreateOrder();
 	const [form, setForm] = useState<FormState>(EMPTY_FORM);
 	const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('e-money');
 	const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
-	const [submitting, setSubmitting] = useState(false);
-	const [submitError, setSubmitError] = useState<string | undefined>();
 	const [confirmation, setConfirmation] = useState<OrderConfirmation | undefined>();
 
 	const vat = Math.round(total * VAT_RATE);
@@ -107,17 +106,15 @@ export function CheckoutPage() {
 		error: !!errors[field],
 	});
 
-	async function submit(event: React.FormEvent) {
+	function submit(event: React.FormEvent) {
 		event.preventDefault();
 		if (items.length === 0) return;
 		const nextErrors = validate(form, paymentMethod);
 		setErrors(nextErrors);
 		if (Object.values(nextErrors).some(Boolean)) return;
 
-		setSubmitting(true);
-		setSubmitError(undefined);
-		try {
-			const order = await createOrder({
+		createOrder.mutate(
+			{
 				customer: {
 					name: form.name,
 					email: form.email,
@@ -130,13 +127,9 @@ export function CheckoutPage() {
 				paymentMethod,
 				eMoneyNumber: paymentMethod === 'e-money' ? form.eMoneyNumber : undefined,
 				items: items.map((item) => ({ slug: item.slug, quantity: item.quantity })),
-			});
-			setConfirmation(order);
-		} catch (error) {
-			setSubmitError(error instanceof Error ? error.message : 'Something went wrong placing your order.');
-		} finally {
-			setSubmitting(false);
-		}
+			},
+			{ onSuccess: (order) => setConfirmation(order) },
+		);
 	}
 
 	return (
@@ -270,9 +263,15 @@ export function CheckoutPage() {
 										<dd className="text-lg font-bold text-primary">{formatPrice(grandTotal)}</dd>
 									</div>
 								</dl>
-								{submitError && <p className="text-body mt-4 text-error">{submitError}</p>}
-								<Button type="submit" disabled={submitting} className="mt-8 w-full">
-									{submitting ? 'Placing order…' : 'Continue & Pay'}
+								{createOrder.isError && (
+									<p className="text-body mt-4 text-error">
+										{createOrder.error instanceof Error
+											? createOrder.error.message
+											: 'Something went wrong placing your order.'}
+									</p>
+								)}
+								<Button type="submit" disabled={createOrder.isPending} className="mt-8 w-full">
+									{createOrder.isPending ? 'Placing order…' : 'Continue & Pay'}
 								</Button>
 							</>
 						)}
