@@ -2,9 +2,8 @@ import { BestGear } from '@/components/best-gear.tsx';
 import { CategoryLinks } from '@/components/category-links.tsx';
 import { QuantitySelector } from '@/components/quantity-selector.tsx';
 import { Button } from '@/components/ui/button.tsx';
-import { getProduct } from '@/lib/api.ts';
 import { useCart } from '@/lib/cart.tsx';
-import type { Product } from '@/lib/types.ts';
+import { useProduct } from '@/lib/queries.ts';
 import { formatPrice } from '@/lib/utils.ts';
 import { getRouteApi, Link, useRouter } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
@@ -15,21 +14,14 @@ export function ProductPage() {
 	const { slug } = route.useParams();
 	const router = useRouter();
 	const { addItem } = useCart();
-	const [product, setProduct] = useState<Product | undefined>();
-	const [notFound, setNotFound] = useState(false);
+	const { data: product, isSuccess } = useProduct(slug);
 	const [quantity, setQuantity] = useState(1);
 
-	useEffect(() => {
-		setProduct(undefined);
-		setNotFound(false);
-		setQuantity(1);
-		getProduct(slug).then((found) => {
-			if (found) setProduct(found);
-			else setNotFound(true);
-		});
-	}, [slug]);
+	// Reset quantity when navigating between product pages (same component, new slug).
+	useEffect(() => setQuantity(1), [slug]);
 
-	if (notFound) {
+	// The query resolved but no product matched this slug.
+	if (isSuccess && !product) {
 		return (
 			<div className="container-app py-24">
 				<p className="text-body opacity-50">Product not found.</p>

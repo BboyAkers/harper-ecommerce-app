@@ -1,26 +1,15 @@
 import { BestGear } from '@/components/best-gear.tsx';
 import { CategoryLinks } from '@/components/category-links.tsx';
 import { Button } from '@/components/ui/button.tsx';
-import { getProductsByCategory } from '@/lib/api.ts';
-import type { Product } from '@/lib/types.ts';
+import { useProductsByCategory } from '@/lib/queries.ts';
 import { cn } from '@/lib/utils.ts';
 import { getRouteApi, Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
 
 const route = getRouteApi('/category/$category');
 
 export function CategoryPage() {
 	const { category } = route.useParams();
-	const [products, setProducts] = useState<Product[] | undefined>();
-	const [error, setError] = useState<string | undefined>();
-
-	useEffect(() => {
-		setProducts(undefined);
-		setError(undefined);
-		getProductsByCategory(category)
-			.then(setProducts)
-			.catch((err: Error) => setError(err.message));
-	}, [category]);
+	const { data: products, error } = useProductsByCategory(category);
 
 	return (
 		<>
@@ -33,7 +22,7 @@ export function CategoryPage() {
 			</section>
 
 			<div className="container-app mt-16 space-y-[120px] sm:mt-[120px] lg:mt-40 lg:space-y-40">
-				{error && <p className="text-body text-error">{error}</p>}
+				{error && <p className="text-body text-error">{error.message}</p>}
 				{products?.length === 0 && <p className="text-body opacity-50">No products found in this category.</p>}
 				{products?.map((product, index) => (
 					<article

@@ -1,21 +1,12 @@
 import { BestGear } from '@/components/best-gear.tsx';
 import { CategoryLinks } from '@/components/category-links.tsx';
 import { Button } from '@/components/ui/button.tsx';
-import { getProducts } from '@/lib/api.ts';
-import type { Product } from '@/lib/types.ts';
+import { useProducts } from '@/lib/queries.ts';
 import { formatPrice } from '@/lib/utils.ts';
 import { Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
 
 export function AllProductsPage() {
-	const [products, setProducts] = useState<Product[] | undefined>();
-	const [error, setError] = useState<string | undefined>();
-
-	useEffect(() => {
-		getProducts()
-			.then(setProducts)
-			.catch((err: Error) => setError(err.message));
-	}, []);
+	const { data: products, error } = useProducts();
 
 	return (
 		<>
@@ -29,7 +20,7 @@ export function AllProductsPage() {
 			</section>
 
 			<div className="container-app mt-16 sm:mt-[120px] lg:mt-40">
-				{error && <p className="text-body text-error">{error}</p>}
+				{error && <p className="text-body text-error">{error.message}</p>}
 				{products?.length === 0 && <p className="text-body opacity-50">No products available.</p>}
 
 				<ul className="space-y-6 lg:space-y-8">
