@@ -11,6 +11,7 @@
 		"format": "prettier --write .",
 		"test": "node --test test/*.test.ts",
 		"test:watch": "node --watch --test test/*.test.ts",
+		"test:integration": "harper-integration-test-run \"integrationTests/**/*.test.ts\"",
 		"build": "vite build",
 		"deploy": "harper deploy_component . restart=true replicated=true"
 	},
@@ -36,11 +37,13 @@
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
+		"@harperfast/integration-testing": "^0.6.3",
 		"@types/node": "^24.10.1",
 		"@types/react": "^19.2.10",
 		"@types/react-dom": "^19.2.3",
 		"eslint": "^10.0.2",
 		"globals": "^17.4.0",
+		"harper": "^5.1.20",
 		"prettier": "^3.8.1",
 		"typescript": "~6.0.0"
 	}
