@@ -59,7 +59,9 @@ export async function buildAppFixture(): Promise<string> {
 	await writeFile(join(dir, 'config.yaml'), FIXTURE_CONFIG);
 	// The config globs (schemas/*.graphql, resources/*.ts, data/*.json) select what actually
 	// loads, so copying the directories wholesale is fine — the real source is the single truth.
-	for (const sub of ['schemas', 'resources', 'data']) {
+	// `shared/` carries no plugin entry but must come along: the resources import the pricing
+	// and inventory rules from it, and Harper resolves those at load time.
+	for (const sub of ['schemas', 'resources', 'data', 'shared']) {
 		await cp(join(projectRoot, sub), join(dir, sub), { recursive: true });
 	}
 	return dir;
@@ -107,6 +109,23 @@ export function postJson(harper: HarperContext, path: string, body: unknown, opt
 	const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
 	if (opts.auth) headers.Authorization = adminAuth(harper);
 	return fetch(restUrl(harper, path), { method: 'POST', headers, body: JSON.stringify(body) });
+}
+
+/** Send a JSON body with an arbitrary method (PUT/PATCH/DELETE). */
+export function sendJson(
+	harper: HarperContext,
+	method: string,
+	path: string,
+	body?: unknown,
+	opts: { auth?: boolean } = {},
+) {
+	const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
+	if (opts.auth) headers.Authorization = adminAuth(harper);
+	return fetch(restUrl(harper, path), {
+		method,
+		headers,
+		body: body === undefined ? undefined : JSON.stringify(body),
+	});
 }
 
 /** A valid customer block for order-creation tests. */

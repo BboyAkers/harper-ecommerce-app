@@ -11,6 +11,9 @@
 		"paths": {
 			"@/*": [
 				"./src/*"
+			],
+			"@shared/*": [
+				"./shared/*"
 			]
 		},
 
@@ -29,5 +32,5 @@
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedSideEffectImports": true
 	},
-	"include": ["src"]
+	"include": ["src", "shared"]
 }

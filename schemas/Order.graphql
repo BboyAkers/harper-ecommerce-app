@@ -21,6 +21,8 @@ type OrderCustomer {
 type Order @table {
 	id: ID @primaryKey
 	createdAt: Date
+	# Set from the session at checkout; unset for guest orders.
+	ownerUsername: String @indexed
 	customer: OrderCustomer
 	paymentMethod: String
 	eMoneyNumber: String

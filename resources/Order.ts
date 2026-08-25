@@ -1,7 +1,7 @@
 import { tables } from 'harper';
-
-const SHIPPING = 50;
-const VAT_RATE = 0.2;
+import { computeTotals } from '../shared/pricing.ts';
+import { availableStock, getProductBySlug, type ProductRecord } from './lib/catalog.ts';
+import { badRequest, conflict } from './lib/errors.ts';
 
 interface OrderItemInput {
 	slug: string;
@@ -25,15 +25,30 @@ interface OrderInput {
 
 const REQUIRED_CUSTOMER_FIELDS = ['name', 'email', 'phone', 'address', 'zip', 'city', 'country'] as const;
 
-function badRequest(message: string): never {
-	const error = new Error(message) as Error & { statusCode: number };
-	error.statusCode = 400;
-	throw error;
+/** Line items priced from the catalog, paired with the product they came from. */
+interface PricedItem {
+	product: ProductRecord;
+	quantity: number;
+	line: {
+		slug: string;
+		name: string;
+		price: number;
+		quantity: number;
+		image: string;
+	};
 }
 
-async function buildOrder(input: OrderInput) {
-	if (!input || typeof input !== 'object') badRequest('Order body is required');
-	const { customer, paymentMethod, eMoneyNumber, items } = input;
+/**
+ * Validate the request and re-price every line from the Product table.
+ *
+ * Nothing about money comes from the client: prices, VAT, and shipping are all
+ * derived here, so a tampered payload changes what is *ordered*, never what is
+ * charged. `ownerUsername` is stamped from the session when there is one;
+ * guest checkout stays supported and leaves it undefined.
+ */
+async function buildOrder(body: unknown, ownerUsername?: string) {
+	if (!body || typeof body !== 'object') badRequest('Order body is required');
+	const { customer, paymentMethod, eMoneyNumber, items } = body as OrderInput;
 
 	if (!customer || typeof customer !== 'object') badRequest('Customer details are required');
 	for (const field of REQUIRED_CUSTOMER_FIELDS) {
@@ -50,29 +65,13 @@ async function buildOrder(input: OrderInput) {
 
 	if (!Array.isArray(items) || items.length === 0) badRequest('Order must contain at least one item');
 
-	// Prices come from the Product table, never from the client.
-	const orderItems = [];
-	for (const item of items) {
-		const quantity = Number(item?.quantity);
-		if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
-			badRequest('Item quantities must be whole numbers between 1 and 99');
-		}
-		const product = await tables.Product.get(item.slug);
-		if (!product) badRequest(`Unknown product "${item?.slug}"`);
-		orderItems.push({
-			slug: product.slug,
-			name: product.shortName,
-			price: product.price,
-			quantity,
-			image: `/assets/cart/image-${product.slug}.jpg`,
-		});
-	}
+	const priced = await priceItems(items);
+	const totals = computeTotals(priced.reduce((sum, item) => sum + item.line.price * item.quantity, 0));
 
-	const total = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-	const vat = Math.round(total * VAT_RATE);
-	return {
+	const order = {
 		id: crypto.randomUUID(),
 		createdAt: new Date().toISOString(),
+		ownerUsername,
 		customer: {
 			name: customer.name.trim(),
 			email: customer.email.trim(),
@@ -84,24 +83,80 @@ async function buildOrder(input: OrderInput) {
 		},
 		paymentMethod,
 		eMoneyNumber: paymentMethod === 'e-money' ? String(eMoneyNumber) : undefined,
-		items: orderItems,
-		total,
-		shipping: SHIPPING,
-		vat,
-		grandTotal: total + SHIPPING,
+		items: priced.map((item) => item.line),
+		...totals,
 	};
+
+	return { order, priced };
+}
+
+/** Resolve each requested slug to a catalog product and price the line. */
+async function priceItems(items: OrderItemInput[]): Promise<PricedItem[]> {
+	const priced: PricedItem[] = [];
+	for (const item of items) {
+		const quantity = Number(item?.quantity);
+		if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+			badRequest('Item quantities must be whole numbers between 1 and 99');
+		}
+
+		const product = await getProductBySlug(item?.slug);
+		if (!product) badRequest(`Unknown product "${item?.slug}"`);
+
+		const stock = availableStock(product);
+		if (stock <= 0) conflict(`"${product.shortName ?? product.slug}" is sold out`);
+		if (quantity > stock) {
+			conflict(`Only ${stock} of "${product.shortName ?? product.slug}" left in stock`);
+		}
+
+		priced.push({
+			product,
+			quantity,
+			line: {
+				slug: product.slug as string,
+				name: product.shortName as string,
+				price: product.price as number,
+				quantity,
+				image: `/assets/cart/image-${product.slug}.jpg`,
+			},
+		});
+	}
+	return priced;
+}
+
+/**
+ * Draw down stock for a placed order.
+ *
+ * Read-and-decrement runs inside the request's transaction, but two orders for
+ * the last unit can still interleave; the stock check above is the guard, not a
+ * guarantee. Oversell is corrected on the next write rather than prevented, which
+ * is the right trade-off for a demo — a real store would reserve inventory first.
+ */
+async function drawDownStock(priced: PricedItem[]) {
+	for (const { product, quantity } of priced) {
+		if (typeof product.stock !== 'number') continue;
+		await tables.Product.patch(product.id, { stock: Math.max(0, product.stock - quantity) });
+	}
 }
 
 export class Order extends tables.Order {
-	// Anyone can place an order; reading orders back still requires a login.
+	// Anyone can place an order, including guests. Reading orders back is scoped
+	// to the ordering customer — see the `search` override below.
+	//
+	// TODO(auth): allowCreate/allowRead are deprecated in Harper 5.2.5 in favour
+	// of authorizing inside the operation. Migrating means taking over the
+	// permission check itself, so it is done as part of the auth work rather than
+	// incidentally here.
 	allowCreate() {
 		return true;
 	}
 
 	// Table instance post is invoked as post(data, query) (loadAsInstance default).
-	async post(data: OrderInput, query?: unknown) {
-		const order = await buildOrder(data);
+	async post(data: unknown, query?: unknown) {
+		const user = this.getCurrentUser();
+		const { order, priced } = await buildOrder(data, user?.username);
 		await super.post(order as never, query as never);
+		await drawDownStock(priced);
 		return order;
 	}
 }
+

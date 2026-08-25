@@ -39,4 +39,9 @@ type Product @table {
 	categoryImage: ImageSet
 	gallery: Gallery
 	others: [RelatedProduct]
+
+	# Inventory. Indexed: faceted search filters on availability and the low-stock
+	# scheduler job queries it. An unset `stock` means the product is untracked.
+	stock: Int @indexed
+	lowStockThreshold: Int
 }

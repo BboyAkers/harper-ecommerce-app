@@ -7,11 +7,9 @@ import { useCart } from '@/lib/cart.tsx';
 import { useCreateOrder } from '@/lib/queries.ts';
 import type { OrderConfirmation } from '@/lib/types.ts';
 import { cn, formatPrice } from '@/lib/utils.ts';
+import { SHIPPING, computeTotals } from '@shared/pricing.ts';
 import { Link, useNavigate, useRouter } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
-
-const SHIPPING = 50;
-const VAT_RATE = 0.2;
 
 type PaymentMethod = 'e-money' | 'cash-on-delivery';
 
@@ -90,8 +88,7 @@ export function CheckoutPage() {
 	const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 	const [confirmation, setConfirmation] = useState<OrderConfirmation | undefined>();
 
-	const vat = Math.round(total * VAT_RATE);
-	const grandTotal = total + SHIPPING;
+	const { vat, grandTotal } = computeTotals(total);
 
 	const update = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement>) => {
 		setForm((current) => ({ ...current, [field]: event.target.value }));

@@ -51,6 +51,7 @@ export type NewListingRecord = Omit<Listing, 'id'>;
 export interface Order {
 	id: string;
 	createdAt?: string;
+	ownerUsername?: string;
 	customer?: OrderCustomer;
 	paymentMethod?: string;
 	eMoneyNumber?: string;
@@ -82,6 +83,8 @@ export interface Product {
 	categoryImage?: ImageSet;
 	gallery?: Gallery;
 	others?: RelatedProduct[];
+	stock?: number;
+	lowStockThreshold?: number;
 }
 
 export type NewProduct = Omit<Product, 'id'>;
