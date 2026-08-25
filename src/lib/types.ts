@@ -2,8 +2,10 @@
 // cannot drift apart. Re-exported here so existing `@/lib/types.ts` imports keep
 // working.
 export type {
+	AuthUser,
 	CartItem,
 	Category,
+	Credentials,
 	Gallery,
 	ImageSet,
 	IncludedItem,
@@ -11,6 +13,7 @@ export type {
 	OrderCustomer,
 	OrderItem,
 	OrderPayload,
+	OrderRecord,
 	PaymentMethod,
 	Product,
 	RelatedProduct,

@@ -162,6 +162,30 @@ async function signIn(context: Context, username: string, password: string): Pro
 		// Deliberately does not distinguish an unknown user from a wrong password.
 		forbidden('Invalid username or password');
 	}
+	await commitSession(context);
+}
+
+/**
+ * Wait for the session row that `context.login()` writes.
+ *
+ * `login` calls `session.update(...)` and does *not* await the resulting put
+ * (Harper's security/auth.ts), so it can resolve — and the Set-Cookie response
+ * can go out — before the session record has committed. A client that uses the
+ * cookie on its very next request then reads back as anonymous. Re-issuing the
+ * same update and awaiting it closes that window; the session id is already
+ * fixed by then, so this rewrites the row rather than creating a second one.
+ *
+ * Nothing but timing depends on this, which is exactly why it is worth a note:
+ * without it the integration suite fails roughly one run in three, and only on
+ * the request that immediately follows a sign-in.
+ */
+async function commitSession(context: Context): Promise<void> {
+	const user = context.user;
+	if (!user || !context.session) return;
+	// Harper stores whatever `login` derived: the record id when there is one,
+	// otherwise the username (which is the users table's primary key).
+	const id = (user as { getId?: () => string }).getId?.() ?? user.username;
+	await context.session.update({ user: id });
 }
 
 // Roles must exist before anyone can register. Component load has no authenticated

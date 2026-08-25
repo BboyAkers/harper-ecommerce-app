@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Input } from '@/components/ui/input.tsx';
 import { Label } from '@/components/ui/label.tsx';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group.tsx';
+import { useAuth } from '@/lib/auth.tsx';
 import { useCart } from '@/lib/cart.tsx';
 import { useCreateOrder } from '@/lib/queries.ts';
 import type { OrderConfirmation } from '@/lib/types.ts';
@@ -82,6 +83,7 @@ export function CheckoutPage() {
 	const navigate = useNavigate();
 	const router = useRouter();
 	const { items, total, removeAll } = useCart();
+	const { user, isLoading: sessionLoading } = useAuth();
 	const createOrder = useCreateOrder();
 	const [form, setForm] = useState<FormState>(EMPTY_FORM);
 	const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('e-money');
@@ -260,6 +262,14 @@ export function CheckoutPage() {
 										<dd className="text-lg font-bold text-primary">{formatPrice(grandTotal)}</dd>
 									</div>
 								</dl>
+								{!sessionLoading && !user && (
+									<p className="text-body mt-6 opacity-50">
+										<Link to="/sign-in" className="font-bold text-primary underline">
+											Sign in
+										</Link>{' '}
+										to keep this order in your history. Guest orders are not listed in an account.
+									</p>
+								)}
 								{createOrder.isError && (
 									<p className="text-body mt-4 text-error">
 										{createOrder.error instanceof Error

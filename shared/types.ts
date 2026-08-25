@@ -98,3 +98,27 @@ export interface OrderConfirmation {
 	vat: number;
 	grandTotal: number;
 }
+
+/**
+ * An order as stored. `OrderConfirmation` is the subset the checkout screen
+ * needs; order history reads the whole record back.
+ */
+export interface OrderRecord extends OrderConfirmation {
+	createdAt: string;
+	/** Set from the session at checkout; absent on guest orders. */
+	ownerUsername?: string;
+	customer: OrderCustomer;
+	paymentMethod: PaymentMethod;
+	eMoneyNumber?: string;
+}
+
+/** The signed-in user, as reported by `GET /Me`. */
+export interface AuthUser {
+	username: string;
+	role?: string;
+}
+
+export interface Credentials {
+	username: string;
+	password: string;
+}

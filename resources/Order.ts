@@ -1,7 +1,9 @@
-import { tables } from 'harper';
+import { type RequestTarget, tables } from 'harper';
 import { computeTotals } from '../shared/pricing.ts';
+import type { OrderRecord } from '../shared/types.ts';
 import { availableStock, getProductBySlug, type ProductRecord } from './lib/catalog.ts';
-import { badRequest, conflict } from './lib/errors.ts';
+import { badRequest, conflict, notFound } from './lib/errors.ts';
+import { isSuperUser, requireUser } from './lib/session.ts';
 
 interface OrderItemInput {
 	slug: string;
@@ -138,14 +140,17 @@ async function drawDownStock(priced: PricedItem[]) {
 	}
 }
 
+/**
+ * Orders are writable by anyone and readable only by the customer who placed them.
+ *
+ * Reads deliberately keep Harper's inherited `allowRead`, which enforces the
+ * role's table-level Order permission — so an anonymous request is rejected
+ * before it reaches this code. Row scoping is layered on below: the role answers
+ * "may this user read orders at all", the overrides answer "which ones".
+ */
 export class Order extends tables.Order {
-	// Anyone can place an order, including guests. Reading orders back is scoped
-	// to the ordering customer — see the `search` override below.
-	//
-	// TODO(auth): allowCreate/allowRead are deprecated in Harper 5.2.5 in favour
-	// of authorizing inside the operation. Migrating means taking over the
-	// permission check itself, so it is done as part of the auth work rather than
-	// incidentally here.
+	// Guest checkout is supported, so placing an order must not require a session.
+	// This opens the endpoint; `post` below does the real validation.
 	allowCreate() {
 		return true;
 	}
@@ -157,6 +162,47 @@ export class Order extends tables.Order {
 		await super.post(order as never, query as never);
 		await drawDownStock(priced);
 		return order;
+	}
+
+	/**
+	 * Scope collection reads to the caller's own orders.
+	 *
+	 * `rowFilter` is evaluated during query execution *and* against the final
+	 * materialized record, so it cannot be sidestepped by crafting conditions —
+	 * unlike appending an `ownerUsername` condition, which a client-supplied
+	 * condition could contradict. Harper runs the same predicate over subscription
+	 * events, so a WebSocket subscriber is scoped by this too.
+	 */
+	search(target: RequestTarget) {
+		const user = requireUser(this.getCurrentUser(), 'Sign in to view your orders');
+		if (!isSuperUser(user)) {
+			const { username } = user;
+			target.rowFilter = (record: Partial<OrderRecord>) => record?.ownerUsername === username;
+		}
+		return super.search(target);
+	}
+
+	/**
+	 * Scope single-record reads the same way.
+	 *
+	 * A collection target (`GET /Order/?…`) is *also* routed through `get` — Harper
+	 * hands it back to the static `search`, which lands on the override above — so
+	 * it has to pass straight through here rather than being treated as a record.
+	 */
+	async get(target?: unknown) {
+		if ((target as RequestTarget | undefined)?.isCollection) return super.get(target as never);
+
+		const record = (await super.get(target as never)) as Partial<OrderRecord> | undefined | null;
+		if (!record) return record;
+
+		const user = requireUser(this.getCurrentUser(), 'Sign in to view your orders');
+		if (isSuperUser(user)) return record;
+		if (record.ownerUsername !== user.username) {
+			// 404 rather than 403: order ids are opaque, and a 403 would confirm
+			// which of them exist.
+			notFound('Order not found');
+		}
+		return record;
 	}
 }
 

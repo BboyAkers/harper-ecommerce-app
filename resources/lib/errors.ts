@@ -16,6 +16,16 @@ export function forbidden(message = 'Not permitted'): never {
 	throw withStatus(new Error(message), 403);
 }
 
+/**
+ * Throw a 404.
+ *
+ * Also used where a 403 would be the literal truth but would confirm that a
+ * record exists — a probing oracle over guessable ids.
+ */
+export function notFound(message = 'Not found'): never {
+	throw withStatus(new Error(message), 404);
+}
+
 /** Throw a 409 — the request conflicts with current state (e.g. insufficient stock). */
 export function conflict(message: string): never {
 	throw withStatus(new Error(message), 409);

@@ -1,10 +1,12 @@
 import { CartDialog } from '@/components/cart-dialog.tsx';
 import { CategoryLinks } from '@/components/category-links.tsx';
 import { NAV_LINKS } from '@/components/nav-links.ts';
+import { useAuth } from '@/lib/auth.tsx';
 import { Link, useLocation } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 
 export function Header() {
+	const { user, isLoading } = useAuth();
 	const [menuOpen, setMenuOpen] = useState(false);
 	const pathname = useLocation({ select: (location) => location.pathname });
 
@@ -41,7 +43,10 @@ export function Header() {
 						</Link>
 					))}
 				</nav>
-				<CartDialog />
+				<div className="flex items-center gap-4 sm:gap-6">
+					<AccountLink username={isLoading ? undefined : (user?.username ?? null)} />
+					<CartDialog />
+				</div>
 			</div>
 			{menuOpen && (
 				<>
@@ -56,5 +61,25 @@ export function Header() {
 				</>
 			)}
 		</header>
+	);
+}
+
+/**
+ * Sign-in / account affordance.
+ *
+ * `undefined` means the session is still being resolved: render the slot at its
+ * final width but empty, so the header does not flash "Sign In" for a visitor
+ * who is in fact signed in.
+ */
+function AccountLink({ username }: { username?: string | null }) {
+	if (username === undefined) return <span className="text-subtitle tracking-[2px] opacity-0">Sign In</span>;
+
+	return (
+		<Link
+			to={username ? '/account' : '/sign-in'}
+			className="text-subtitle max-w-[140px] truncate tracking-[2px] transition-colors hover:text-primary"
+		>
+			{username ?? 'Sign In'}
+		</Link>
 	);
 }

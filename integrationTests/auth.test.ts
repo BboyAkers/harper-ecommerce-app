@@ -8,45 +8,12 @@
  * feeds) is force-precedence and overrides that CLI flag, so anonymous really means
  * anonymous here — which is the only way to assert any of this.
  */
-import { teardownHarper, type ContextWithHarper, type HarperContext } from '@harperfast/integration-testing';
+import { teardownHarper, type ContextWithHarper } from '@harperfast/integration-testing';
 import { ok, strictEqual } from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import { after, before, suite, test } from 'node:test';
 import { adminAuth, adminOperation, restUrl, startAppHarper, VALID_CUSTOMER } from './helpers/app-fixture.ts';
-
-const PASSWORD = 'correct-horse-battery';
-
-/** POST JSON, optionally carrying a session cookie, returning the response plus any new cookie. */
-async function post(harper: HarperContext, path: string, body?: unknown, cookie?: string) {
-	const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
-	if (cookie) headers.Cookie = cookie;
-	const response = await fetch(restUrl(harper, path), {
-		method: 'POST',
-		headers,
-		body: body === undefined ? undefined : JSON.stringify(body),
-	});
-	return { response, cookie: sessionCookie(response) ?? cookie };
-}
-
-async function get(harper: HarperContext, path: string, cookie?: string) {
-	const headers: Record<string, string> = { Accept: 'application/json' };
-	if (cookie) headers.Cookie = cookie;
-	return fetch(restUrl(harper, path), { headers });
-}
-
-/** Pull the `name=value` pair out of a Set-Cookie response header. */
-function sessionCookie(response: Response): string | undefined {
-	const header = response.headers.get('set-cookie');
-	if (!header) return undefined;
-	return header.split(';')[0];
-}
-
-/** Register a customer and return its session cookie. */
-async function register(harper: HarperContext, username: string) {
-	const { response, cookie } = await post(harper, '/SignUp', { username, password: PASSWORD });
-	ok(response.ok, `sign-up should succeed, got ${response.status}`);
-	return cookie;
-}
+import { get, PASSWORD, post, register } from './helpers/session.ts';
 
 suite('authentication', (ctx: ContextWithHarper) => {
 	let fixtureDir: string;
@@ -85,6 +52,18 @@ suite('authentication', (ctx: ContextWithHarper) => {
 		const identity = (await me.json()) as { username: string; role: string };
 		strictEqual(identity.username, 'ada.customer');
 		strictEqual(identity.role, 'customer');
+	});
+
+	test('leaves the new session usable on the very next request', async () => {
+		// `context.login()` fires the session write without awaiting it, so the
+		// Set-Cookie response can beat the committed session record and the next
+		// request reads back as anonymous. `resources/Auth.ts` waits for that write;
+		// a single attempt reproduced the race about one run in three, so loop.
+		for (let attempt = 0; attempt < 5; attempt++) {
+			const cookie = await register(ctx.harper, `race.attempt${attempt}`);
+			const me = await get(ctx.harper, '/Me', cookie);
+			strictEqual(me.status, 200, `attempt ${attempt}: a fresh session must already identify its user`);
+		}
 	});
 
 	test('never lets a registration choose its own role', async () => {
