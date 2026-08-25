@@ -111,6 +111,27 @@ export function postJson(harper: HarperContext, path: string, body: unknown, opt
 	return fetch(restUrl(harper, path), { method: 'POST', headers, body: JSON.stringify(body) });
 }
 
+/**
+ * Run an operations-API call as the instance admin.
+ *
+ * The harness's own `sendOperation` sends no credentials, which is fine while
+ * `authorizeLocal` is on (every loopback call is super_user) but fails with
+ * "Must login" in suites that turn the bypass off.
+ */
+export async function adminOperation(harper: HarperContext, operation: Record<string, unknown>) {
+	const response = await fetch(harper.operationsAPIURL, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Accept: 'application/json',
+			Authorization: adminAuth(harper),
+		},
+		body: JSON.stringify(operation),
+	});
+	if (!response.ok) throw new Error(`operation ${operation.operation} failed: ${response.status}`);
+	return response.json();
+}
+
 /** Send a JSON body with an arbitrary method (PUT/PATCH/DELETE). */
 export function sendJson(
 	harper: HarperContext,
