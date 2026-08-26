@@ -41,6 +41,8 @@ const ROLES: RoleDefinition[] = [
 				tables: {
 					Product: grant(true, false, false, false),
 					Order: grant(true, true, false, false),
+					// A cart is created, rewritten and emptied by its owner.
+					Cart: grant(true, true, true, true),
 				},
 			},
 		},
@@ -54,14 +56,48 @@ const ROLES: RoleDefinition[] = [
 				tables: {
 					Product: grant(true, true, true, true),
 					Order: grant(true, false, true, false),
+					// Editors shop too; the resource scopes them to their own cart.
+					Cart: grant(true, true, true, true),
 				},
 			},
 		},
 	},
 ];
 
+/** A role as `list_roles` reports it. */
+interface ExistingRole {
+	id: string;
+	role: string;
+	permission?: { data?: { tables?: Record<string, Partial<TablePermission>> } };
+}
+
 /**
- * Create any missing application roles.
+ * True when the stored role already grants exactly what this file asks for.
+ *
+ * Only the tables this app defines are compared. Harper normalises what it
+ * stores, and an operator may have granted more by hand, so a deep equality
+ * check would rewrite every role on every boot.
+ */
+function grantsAreCurrent(stored: ExistingRole, wanted: RoleDefinition): boolean {
+	const storedTables = stored.permission?.data?.tables ?? {};
+	return Object.entries(wanted.permission.data.tables).every(([table, grant]) => {
+		const current = storedTables[table];
+		return (
+			current?.read === grant.read &&
+			current?.insert === grant.insert &&
+			current?.update === grant.update &&
+			current?.delete === grant.delete
+		);
+	});
+}
+
+/**
+ * Create any missing application roles, and bring existing ones up to date.
+ *
+ * Reconciling rather than only creating matters because roles outlive the code:
+ * an instance that has already run an older build carries roles that predate
+ * whatever table was added since, and a create-only bootstrap would leave every
+ * existing customer unable to use it.
  *
  * Runs with authorization bypassed: `server.operation()` without a context sets
  * `bypassAuth`, which is the only way a component can manage roles at startup
@@ -69,12 +105,24 @@ const ROLES: RoleDefinition[] = [
  * constants — nothing from a request reaches this call.
  */
 export async function ensureRoles(): Promise<void> {
-	const existing = (await server.operation({ operation: 'list_roles' }, undefined)) as { role: string }[];
-	const present = new Set(existing.map((role) => role.role));
+	const existing = (await server.operation({ operation: 'list_roles' }, undefined)) as ExistingRole[];
+	const byName = new Map(existing.map((role) => [role.role, role]));
 
 	for (const definition of ROLES) {
-		if (present.has(definition.role)) continue;
-		await server.operation({ operation: 'add_role', ...definition }, undefined);
-		logger.notify?.(`Created "${definition.role}" role`);
+		const current = byName.get(definition.role);
+
+		if (!current) {
+			await server.operation({ operation: 'add_role', ...definition }, undefined);
+			logger.notify?.(`Created "${definition.role}" role`);
+			continue;
+		}
+
+		if (grantsAreCurrent(current, definition)) continue;
+
+		await server.operation(
+			{ operation: 'alter_role', id: current.id, role: definition.role, permission: definition.permission },
+			undefined,
+		);
+		logger.notify?.(`Updated the "${definition.role}" role's table grants`);
 	}
 }

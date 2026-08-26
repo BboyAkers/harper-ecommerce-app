@@ -1,4 +1,5 @@
 import type { AuthUser, Credentials, OrderConfirmation, OrderPayload, OrderRecord, Product } from '@/lib/types.ts';
+import type { CartAdjustment, CartLine } from '@shared/cart.ts';
 
 // Low-level fetchers. Caching/dedup/state is handled by React Query (see queries.ts);
 // these just talk to Harper's REST API and throw on failure.
@@ -19,14 +20,18 @@ async function failure(response: Response, fallback: string): Promise<Error> {
 	}
 }
 
-async function postJson<T>(path: string, body: unknown, fallback: string): Promise<T> {
+async function sendJson<T>(method: string, path: string, body: unknown, fallback: string): Promise<T> {
 	const response = await fetch(path, {
-		method: 'POST',
+		method,
 		headers: { ...JSON_HEADERS, 'Content-Type': 'application/json' },
 		body: JSON.stringify(body),
 	});
 	if (!response.ok) throw await failure(response, fallback);
 	return (await response.json()) as T;
+}
+
+function postJson<T>(path: string, body: unknown, fallback: string): Promise<T> {
+	return sendJson<T>('POST', path, body, fallback);
 }
 
 export async function fetchProducts(): Promise<Product[]> {
@@ -74,4 +79,32 @@ export function signUp(credentials: Credentials): Promise<AuthUser> {
 
 export function signOut(): Promise<{ signedOut: boolean }> {
 	return postJson<{ signedOut: boolean }>('/SignOut', {}, 'Sign out failed');
+}
+
+/** The server's view of a cart, plus anything stock forced it to change. */
+export interface CartResult {
+	id: string;
+	items: CartLine[];
+	adjustments: CartAdjustment[];
+}
+
+/**
+ * Replace the stored cart.
+ *
+ * The cart is keyed by username, so the path names the owner and the server
+ * checks it against the session — there is no cart id to hold onto.
+ */
+export function saveCart(username: string, items: CartLine[]): Promise<CartResult> {
+	return sendJson<CartResult>('PUT', `/Cart/${encodeURIComponent(username)}`, { items }, 'Could not save your cart');
+}
+
+/**
+ * Merge a guest cart into the stored one, keeping the larger quantity per slug.
+ *
+ * This is the sign-in path. Posting an empty list is the natural way to *read*
+ * the stored cart on a reload — the merge is a no-op and the response is the
+ * cart — so the storefront needs only this one call to adopt a session's cart.
+ */
+export function mergeCart(username: string, items: CartLine[]): Promise<CartResult> {
+	return postJson<CartResult>(`/Cart/${encodeURIComponent(username)}`, { items }, 'Could not restore your cart');
 }

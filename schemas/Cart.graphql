@@ -1,0 +1,16 @@
+type CartLine {
+	slug: String
+	quantity: Int
+}
+
+# Not exported directly: extended with ownership and stock rules in
+# resources/Cart.ts. The primary key is the owner's username, so a cart is
+# addressed as /Cart/<username> and there is exactly one per customer.
+#
+# Guests have no record here — their cart lives in localStorage until they sign
+# in, at which point it is merged in (see src/lib/cart.tsx).
+type Cart @table {
+	id: ID @primaryKey
+	items: [CartLine]
+	updatedAt: Date @updatedTime
+}

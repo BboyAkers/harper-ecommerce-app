@@ -16,6 +16,17 @@ export type { Agent as AgentRecord };
 export type AgentRecords = Agent[];
 export type NewAgentRecord = Omit<Agent, 'id'>;
 
+export interface Cart {
+	id: string;
+	items?: CartLine[];
+	updatedAt?: string;
+}
+
+export type NewCart = Omit<Cart, 'id'>;
+export type { Cart as CartRecord };
+export type CartRecords = Cart[];
+export type NewCartRecord = Omit<Cart, 'id'>;
+
 export interface Listing {
 	id: string;
 	addressLine?: string;

@@ -7,7 +7,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 
 export function CartDialog() {
-	const { items, total, totalQuantity, setQuantity, removeAll } = useCart();
+	const { items, total, totalQuantity, adjustments, dismissAdjustments, setQuantity, removeAll } = useCart();
 	const [open, setOpen] = useState(false);
 	const navigate = useNavigate();
 
@@ -36,7 +36,8 @@ export function CartDialog() {
 					<>
 						<div className="flex items-center justify-between">
 							<DialogTitle className="text-lg font-bold uppercase tracking-[1.29px]">
-								Cart ({items.length})
+								{/* Units, matching the badge — these used to disagree whenever a line held more than one. */}
+								Cart ({totalQuantity})
 							</DialogTitle>
 							<button
 								type="button"
@@ -47,6 +48,20 @@ export function CartDialog() {
 							</button>
 						</div>
 						<DialogDescription className="sr-only">Items currently in your cart</DialogDescription>
+						{adjustments.length > 0 && (
+							<div className="mt-6 rounded-lg bg-light p-4">
+								<p className="text-body text-error">
+									Stock changed while these were in your cart, so we adjusted the quantities.
+								</p>
+								<button
+									type="button"
+									onClick={dismissAdjustments}
+									className="text-body mt-2 cursor-pointer underline opacity-50 transition hover:opacity-100"
+								>
+									Got it
+								</button>
+							</div>
+						)}
 						<ul className="mt-8 space-y-6">
 							{items.map((item) => (
 								<li key={item.slug} className="flex items-center gap-4">
