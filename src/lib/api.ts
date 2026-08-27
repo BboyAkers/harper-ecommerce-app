@@ -41,6 +41,57 @@ export async function fetchProducts(): Promise<Product[]> {
 	return products.sort((a, b) => a.ord - b.ord);
 }
 
+/**
+ * The editable half of a catalog record.
+ *
+ * `id` is absent on purpose. A product created here is given its id by Harper,
+ * while `slug` — what the storefront routes on — is a separate indexed
+ * attribute. Letting the two diverge is exactly the case `getProductBySlug` in
+ * `resources/lib/catalog.ts` exists to support, so the authoring UI must not
+ * quietly re-couple them by inventing an id from the slug.
+ *
+ * `stock` and `lowStockThreshold` widen to `null` because "untracked" has to be
+ * expressible. Omitting a key from a PATCH means "leave this alone", so
+ * clearing a field needs an actual value to send, and `null` is one
+ * `shared/inventory.ts` already reads as untracked (`typeof null !== 'number'`).
+ */
+export type ProductDraft = Omit<Product, 'id' | 'stock' | 'lowStockThreshold'> & {
+	stock: number | null;
+	lowStockThreshold: number | null;
+};
+
+/** Send a request whose response body the caller has no use for. */
+async function send(method: string, path: string, body: unknown, fallback: string): Promise<void> {
+	const response = await fetch(path, {
+		method,
+		headers: body === undefined ? JSON_HEADERS : { ...JSON_HEADERS, 'Content-Type': 'application/json' },
+		body: body === undefined ? undefined : JSON.stringify(body),
+	});
+	if (!response.ok) throw await failure(response, fallback);
+}
+
+// Catalog authoring. These three calls are the `editor` role's insert/update/
+// delete grants on Product (`resources/lib/roles.ts`); Harper checks them in
+// `Table.allowCreate`/`allowUpdate`/`allowDelete` before the request reaches the
+// table, so a customer's session is refused here no matter what the UI renders.
+
+export function createProduct(draft: ProductDraft): Promise<void> {
+	return send('POST', '/Product/', draft, 'Could not create the product');
+}
+
+/**
+ * PATCH, never PUT: a PUT replaces the record, so any attribute this form does
+ * not send — one added to the schema later, or one an operator set by hand —
+ * would be erased by an edit that never mentioned it.
+ */
+export function updateProduct(id: string, changes: Partial<ProductDraft>): Promise<void> {
+	return send('PATCH', `/Product/${encodeURIComponent(id)}`, changes, 'Could not save the product');
+}
+
+export function deleteProduct(id: string): Promise<void> {
+	return send('DELETE', `/Product/${encodeURIComponent(id)}`, undefined, 'Could not delete the product');
+}
+
 export function createOrder(payload: OrderPayload): Promise<OrderConfirmation> {
 	return postJson<OrderConfirmation>('/Order/', payload, 'Order failed');
 }

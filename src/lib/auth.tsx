@@ -76,3 +76,21 @@ export function useAuth() {
 	if (!context) throw new Error('useAuth must be used within AuthProvider');
 	return context;
 }
+
+/**
+ * Roles that may reach the catalog editor.
+ *
+ * `editor` is the application role defined in `resources/lib/roles.ts`, which
+ * is what actually carries the Product insert/update/delete grants.
+ * `super_user` is included so an administrator can use the UI without having to
+ * be granted a second role.
+ *
+ * This gates what the storefront *renders*, not what the server *allows*.
+ * Harper re-checks the role's table grants on every write, so hiding the link
+ * is a courtesy to customers, never the control.
+ */
+const CATALOG_ROLES: ReadonlySet<string> = new Set(['editor', 'super_user']);
+
+export function canEditCatalog(user: AuthUser | null): boolean {
+	return user?.role !== undefined && CATALOG_ROLES.has(user.role);
+}

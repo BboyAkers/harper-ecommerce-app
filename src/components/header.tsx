@@ -1,7 +1,7 @@
 import { CartDialog } from '@/components/cart-dialog.tsx';
 import { CategoryLinks } from '@/components/category-links.tsx';
 import { NAV_LINKS } from '@/components/nav-links.ts';
-import { useAuth } from '@/lib/auth.tsx';
+import { canEditCatalog, useAuth } from '@/lib/auth.tsx';
 import { Link, useLocation } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 
@@ -29,7 +29,11 @@ export function Header() {
 						<rect y="12" width="16" height="3" fill="currentColor" />
 					</svg>
 				</button>
-				<Link to="/" aria-label="Audiophile home" className="sm:absolute sm:left-1/2 sm:-translate-x-1/2 lg:static lg:translate-x-0">
+				<Link
+					to="/"
+					aria-label="Audiophile home"
+					className="sm:absolute sm:left-1/2 sm:-translate-x-1/2 lg:static lg:translate-x-0"
+				>
 					<img src="/assets/shared/desktop/logo.svg" alt="audiophile" className="h-[25px] w-[143px]" />
 				</Link>
 				<nav className="hidden items-center gap-[34px] lg:flex">
@@ -44,6 +48,17 @@ export function Header() {
 					))}
 				</nav>
 				<div className="flex items-center gap-4 sm:gap-6">
+					{/* Editors reach the catalog from wherever they are. Hidden from
+					    everyone else as an affordance, not as a control — the routes
+					    behind it re-check, and Harper checks again on every write. */}
+					{canEditCatalog(user) && (
+						<Link
+							to="/admin"
+							className="text-subtitle hidden tracking-[2px] transition-colors hover:text-primary sm:block"
+						>
+							Catalog
+						</Link>
+					)}
 					<AccountLink username={isLoading ? undefined : (user?.username ?? null)} />
 					<CartDialog />
 				</div>
