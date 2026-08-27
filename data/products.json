@@ -1,4 +1,5 @@
 {
+	"database": "harper_ecommerce_app",
 	"table": "Product",
 	"records": [
 		{

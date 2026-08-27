@@ -30,11 +30,29 @@ suite('product catalog API', (ctx: ContextWithHarper) => {
 		await rm(fixtureDir, { recursive: true, force: true });
 	});
 
-	test('boots with Product and Order tables registered', async () => {
-		const description = await sendOperation(ctx.harper, { operation: 'describe_all' });
-		const tables = Object.values<Record<string, unknown>>(description).flatMap((db) => Object.keys(db));
-		ok(tables.includes('Product'), `expected a Product table, got: ${tables.join(', ')}`);
-		ok(tables.includes('Order'), `expected an Order table, got: ${tables.join(', ')}`);
+	test('boots with Product and Order tables in the named database', async () => {
+		const description = (await sendOperation(ctx.harper, { operation: 'describe_all' })) as Record<
+			string,
+			Record<string, unknown>
+		>;
+		// The database name is asserted, not just the table names: the schemas declare
+		// `@table(database: "harper_ecommerce_app")`, and dropping that argument would land these
+		// tables in Harper's default `data` database without erroring. Spelled out rather than
+		// imported from `resources/lib/tables.ts`, so a rename fails here instead of following along.
+		ok(
+			description.harper_ecommerce_app,
+			`expected a harper_ecommerce_app database, got: ${Object.keys(description).join(', ')}`,
+		);
+		const tables = Object.keys(description.harper_ecommerce_app);
+		for (const name of ['Product', 'Order', 'Cart']) {
+			ok(tables.includes(name), `expected a ${name} table, got: ${tables.join(', ')}`);
+		}
+		// And nothing left behind in the default database. `dataLoader` would create an inferred
+		// Product table there if `data/products.json` ever lost its `database` key.
+		const defaultTables = Object.keys(description.data ?? {});
+		for (const name of ['Product', 'Order', 'Cart']) {
+			ok(!defaultTables.includes(name), `${name} should not exist in the default "data" database`);
+		}
 	});
 
 	test('seeds all six products and serves them over REST', async () => {

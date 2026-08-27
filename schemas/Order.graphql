@@ -18,7 +18,7 @@ type OrderCustomer {
 
 # Not exported directly: extended with validation and server-side totals
 # in resources/Order.ts.
-type Order @table {
+type Order @table(database: "harper_ecommerce_app") {
 	id: ID @primaryKey
 	createdAt: Date
 	# Set from the session at checkout; unset for guest orders.
