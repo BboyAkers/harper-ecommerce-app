@@ -4,6 +4,7 @@
  */
 import { strictEqual } from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { MAX_LINE_QUANTITY } from '../shared/cart.ts';
 import {
 	availableStock,
 	canFulfil,
@@ -11,6 +12,9 @@ import {
 	isLowStock,
 	isSoldOut,
 	isTracked,
+	maxOrderable,
+	stockLabel,
+	stockState,
 } from '../shared/inventory.ts';
 
 describe('availableStock', () => {
@@ -70,5 +74,58 @@ describe('canFulfil', () => {
 
 	it('allows any positive quantity for an untracked product', () => {
 		strictEqual(canFulfil({}, 999), true);
+	});
+});
+
+describe('stockState', () => {
+	it('classifies each state exactly once', () => {
+		strictEqual(stockState({}), 'untracked');
+		strictEqual(stockState({ stock: 0 }), 'sold-out');
+		strictEqual(stockState({ stock: DEFAULT_LOW_STOCK_THRESHOLD }), 'low');
+		strictEqual(stockState({ stock: DEFAULT_LOW_STOCK_THRESHOLD + 1 }), 'in-stock');
+	});
+
+	it('honours a per-product threshold', () => {
+		// Seeded case: zx9-speaker has 8 units but a threshold of 10.
+		strictEqual(stockState({ stock: 8, lowStockThreshold: 10 }), 'low');
+		strictEqual(stockState({ stock: 8 }), 'in-stock');
+	});
+});
+
+describe('stockLabel', () => {
+	it('says nothing when there is nothing worth saying', () => {
+		// No badge beats a reassuring badge nobody needs to read.
+		strictEqual(stockLabel({}), null);
+		strictEqual(stockLabel({ stock: 42 }), null);
+	});
+
+	it('names the two states a shopper needs to act on', () => {
+		strictEqual(stockLabel({ stock: 0 }), 'Sold out');
+		strictEqual(stockLabel({ stock: 3 }), 'Only 3 left');
+		strictEqual(stockLabel({ stock: 1 }), 'Only 1 left');
+	});
+
+	it('reports the real count when a threshold override widens the low band', () => {
+		strictEqual(stockLabel({ stock: 8, lowStockThreshold: 10 }), 'Only 8 left');
+	});
+});
+
+describe('maxOrderable', () => {
+	it('is bounded by stock when stock is the tighter limit', () => {
+		strictEqual(maxOrderable({ stock: 3 }), 3);
+		strictEqual(maxOrderable({ stock: 0 }), 0);
+	});
+
+	it('is bounded by the per-line cap when stock is plentiful', () => {
+		// Never let a quantity control offer more than one line may hold.
+		strictEqual(maxOrderable({ stock: 500 }), MAX_LINE_QUANTITY);
+		strictEqual(maxOrderable({}), MAX_LINE_QUANTITY);
+	});
+
+	it('agrees with canFulfil at the boundary', () => {
+		const product = { stock: 4 };
+		const max = maxOrderable(product);
+		strictEqual(canFulfil(product, max), true);
+		strictEqual(canFulfil(product, max + 1), false);
 	});
 });

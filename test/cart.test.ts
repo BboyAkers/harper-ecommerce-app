@@ -91,6 +91,25 @@ describe('clampToStock', () => {
 		deepStrictEqual(result.adjustments, []);
 	});
 
+	test('can empty the cart entirely while still reporting why', () => {
+		// The case the cart dialog's banner placement depends on: every line is
+		// sold out, so `items` is empty and the adjustments are the ONLY record of
+		// what happened. Rendering that banner inside a non-empty branch showed
+		// the customer "Your cart is empty" and no explanation at all.
+		const result = clampToStock(
+			[
+				{ slug: 'a', quantity: 2 },
+				{ slug: 'b', quantity: 1 },
+			],
+			stock({ a: 0, b: 0 }),
+		);
+		deepStrictEqual(result.items, []);
+		deepStrictEqual(result.adjustments, [
+			{ slug: 'a', requested: 2, available: 0 },
+			{ slug: 'b', requested: 1, available: 0 },
+		]);
+	});
+
 	test('clamps only the lines that need it', () => {
 		const result = clampToStock(
 			[

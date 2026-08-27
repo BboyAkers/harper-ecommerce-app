@@ -1,9 +1,42 @@
 import { BestGear } from '@/components/best-gear.tsx';
 import { CategoryLinks } from '@/components/category-links.tsx';
+import { StockBadge } from '@/components/stock-badge.tsx';
 import { Button } from '@/components/ui/button.tsx';
+import { useProducts } from '@/lib/queries.ts';
+import type { Product } from '@/lib/types.ts';
 import { Link } from '@tanstack/react-router';
 
+/**
+ * The products this page is designed around.
+ *
+ * The copy in each section is editorial — hand-written headlines and imagery,
+ * not catalog fields — so it stays hardcoded. Making it data-driven would mean
+ * inventing `heroEyebrow`/`heroTitle`/`heroBody` columns on Product, a bigger
+ * change than this page needs. Naming the slugs buys the one thing that
+ * genuinely goes stale: live stock. Before this, the hero could advertise a
+ * sold-out product under a confident "See Product" button.
+ *
+ * Not handled here: a slug leaving the catalog entirely. That is a CMS-era
+ * concern, and the CMS design unpublishes rather than deletes precisely so
+ * existing references keep resolving.
+ */
+const FEATURED = {
+	hero: 'xx99-mark-two-headphones',
+	zx9: 'zx9-speaker',
+	zx7: 'zx7-speaker',
+	yx1: 'yx1-earphones',
+} as const;
+
 export function HomePage() {
+	const { data: products } = useProducts();
+	const bySlug = new Map((products ?? []).map((product) => [product.slug, product]));
+
+	/** The badge for a featured slug, or nothing until the catalog resolves. */
+	const badge = (slug: string, className?: string) => {
+		const product: Product | undefined = bySlug.get(slug);
+		return product ? <StockBadge product={product} className={className} /> : null;
+	};
+
 	return (
 		<>
 			{/* Hero */}
@@ -19,7 +52,12 @@ export function HomePage() {
 				</picture>
 				<div className="container-app relative flex min-h-[510px] items-center justify-center py-24 text-center lg:min-h-[632px] lg:justify-start lg:text-left">
 					<div className="max-w-[398px]">
-						<p className="text-overline text-white/50">New product</p>
+						<div className="flex flex-wrap items-baseline justify-center gap-x-4 gap-y-1 lg:justify-start">
+							<p className="text-overline text-white/50">New product</p>
+							{/* text-white deliberately: neither text-error nor text-primary reads on
+							    charcoal, and the label already names the state. */}
+							{badge(FEATURED.hero, 'text-white')}
+						</div>
 						<h1 className="mt-4 text-4xl font-bold uppercase leading-[40px] tracking-[1.29px] sm:text-[56px] sm:leading-[58px] sm:tracking-[2px] lg:mt-6">
 							XX99 Mark II Headphones
 						</h1>
@@ -28,7 +66,7 @@ export function HomePage() {
 							enthusiast.
 						</p>
 						<Button asChild className="mt-7 lg:mt-10">
-							<Link to="/product/$slug" params={{ slug: 'xx99-mark-two-headphones' }}>
+							<Link to="/product/$slug" params={{ slug: FEATURED.hero }}>
 								See Product
 							</Link>
 						</Button>
@@ -62,11 +100,12 @@ export function HomePage() {
 							<h2 className="text-4xl font-bold uppercase leading-10 tracking-[1.29px] sm:text-[56px] sm:leading-[58px] sm:tracking-[2px]">
 								ZX9 Speaker
 							</h2>
+							{badge(FEATURED.zx9, 'mt-4 block text-white')}
 							<p className="text-body mt-6 text-white/75">
 								Upgrade to premium speakers that are phenomenally built to deliver truly remarkable sound.
 							</p>
 							<Button asChild variant="dark" className="mt-6 lg:mt-10">
-								<Link to="/product/$slug" params={{ slug: 'zx9-speaker' }}>
+								<Link to="/product/$slug" params={{ slug: FEATURED.zx9 }}>
 									See Product
 								</Link>
 							</Button>
@@ -85,8 +124,9 @@ export function HomePage() {
 					</picture>
 					<div className="absolute inset-0 flex flex-col items-start justify-center px-6 sm:px-[62px] lg:px-[95px]">
 						<h2 className="text-[28px] font-bold uppercase tracking-[2px]">ZX7 Speaker</h2>
+						{badge(FEATURED.zx7, 'mt-3 block')}
 						<Button asChild variant="secondary" className="mt-8">
-							<Link to="/product/$slug" params={{ slug: 'zx7-speaker' }}>
+							<Link to="/product/$slug" params={{ slug: FEATURED.zx7 }}>
 								See Product
 							</Link>
 						</Button>
@@ -107,8 +147,9 @@ export function HomePage() {
 				</picture>
 				<div className="flex h-[200px] flex-col items-start justify-center rounded-lg bg-light px-6 sm:h-80 sm:px-10 lg:px-[95px]">
 					<h2 className="text-[28px] font-bold uppercase tracking-[2px]">YX1 Earphones</h2>
+					{badge(FEATURED.yx1, 'mt-3 block')}
 					<Button asChild variant="secondary" className="mt-8">
-						<Link to="/product/$slug" params={{ slug: 'yx1-earphones' }}>
+						<Link to="/product/$slug" params={{ slug: FEATURED.yx1 }}>
 							See Product
 						</Link>
 					</Button>
