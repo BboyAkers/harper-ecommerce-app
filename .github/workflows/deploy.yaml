@@ -1,0 +1,46 @@
+# Deploys to the Harper Fabric cluster on every push to main.
+#
+# See ci.yaml for why this directory is plural — until it was renamed, this
+# workflow had never run, not even by manual dispatch.
+name: Deploy to Harper Fabric
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  # A single group with cancel-in-progress off, so two merges to main queue
+  # rather than racing each other onto the cluster.
+  group: main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Set up Node.js
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          cache: 'npm'
+          node-version-file: '.nvmrc'
+      - name: Install dependencies
+        run: npm ci
+      # Re-verified here rather than trusting the CI run on the same commit:
+      # this job pushes to a live cluster, and the cost of the duplicate work is
+      # far below the cost of deploying an untested merge. The integration
+      # suites are deliberately left to ci.yaml — they take minutes and have
+      # already gated the pull request.
+      - name: Run lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Run unit tests
+        run: npm test
+      - name: Build & deploy
+        run: npm run deploy
