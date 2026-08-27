@@ -1,4 +1,4 @@
-import { tables } from 'harper';
+import { type SubscriptionRequest, tables } from 'harper';
 import { type CartAdjustment, type CartLine, clampToStock, isValidLine, mergeCartLines } from '../shared/cart.ts';
 import { availableStock, getProductBySlug } from './lib/catalog.ts';
 import { badRequest, notFound } from './lib/errors.ts';
@@ -100,6 +100,23 @@ export class Cart extends tables.Cart {
 			notFound('Cart not found');
 		}
 		return String(requested);
+	}
+
+	/**
+	 * Scope live subscriptions to the caller's own cart.
+	 *
+	 * `Resource.connect()` calls `subscribe()` directly — it never routes through
+	 * `get`/`put`/`post`/`delete`, where `owner()` is enforced — and the only
+	 * authorization on that path is `allowRead`, which this class opens to
+	 * everyone. Without this override, `ws://…/Cart/<any-username>` streams
+	 * another customer's cart to a client that never signed in.
+	 *
+	 * `owner()` already encodes the whole rule and the right status codes, so
+	 * this is the same guard the other methods use, not a second copy of it.
+	 */
+	subscribe(request: SubscriptionRequest) {
+		this.owner();
+		return super.subscribe(request);
 	}
 
 	async get() {
