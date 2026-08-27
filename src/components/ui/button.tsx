@@ -20,6 +20,15 @@ const buttonVariants = cva(
 );
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
+	/**
+	 * Render the child element instead of a `<button>` (via Radix `Slot`) — used
+	 * to make a `<Link>` look like a button.
+	 *
+	 * CAUTION: `disabled` is meaningless with `asChild`. It is not a valid anchor
+	 * attribute, so React drops it and the link stays clickable — silently. To
+	 * present a disabled navigation, render a
+	 * `<span className={buttonVariants({ variant })} aria-disabled>` instead.
+	 */
 	asChild?: boolean;
 }
 

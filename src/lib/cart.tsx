@@ -2,7 +2,8 @@ import { mergeCart, saveCart } from '@/lib/api.ts';
 import { useAuth } from '@/lib/auth.tsx';
 import { useProducts } from '@/lib/queries.ts';
 import type { CartItem, Product } from '@/lib/types.ts';
-import { type CartAdjustment, type CartLine, isValidLine, MAX_LINE_QUANTITY } from '@shared/cart.ts';
+import { type CartAdjustment, type CartLine, clampToStock, isValidLine, MAX_LINE_QUANTITY } from '@shared/cart.ts';
+import { availableStock } from '@shared/inventory.ts';
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
@@ -21,12 +22,25 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 
 const STORAGE_KEY = 'audiophile-cart';
 
+/**
+ * An adjustment with the product's name resolved.
+ *
+ * This lives here rather than in `shared/cart.ts` because a display name is a
+ * storefront concern and that module deliberately holds none. It matters that
+ * the resolution happens in the provider: `clampToStock` *drops* a sold-out
+ * line entirely, so by the time the dialog renders, the slug is gone from
+ * `items` and only the catalog can still say what it was called.
+ */
+export interface CartAdjustmentView extends CartAdjustment {
+	shortName: string;
+}
+
 interface CartContextValue {
 	items: CartItem[];
 	totalQuantity: number;
 	total: number;
-	/** Lines the server reduced because stock moved; empty most of the time. */
-	adjustments: CartAdjustment[];
+	/** Lines reduced because stock moved; empty most of the time. */
+	adjustments: CartAdjustmentView[];
 	dismissAdjustments: () => void;
 	addItem: (product: Product, quantity: number) => void;
 	setQuantity: (slug: string, quantity: number) => void;
@@ -107,6 +121,33 @@ export function CartProvider({ children }: { children: ReactNode }) {
 		};
 	}, [username]);
 
+	/**
+	 * Keep a guest's cart honest about stock.
+	 *
+	 * A signed-in cart is reconciled server-side on every write; a guest's lives
+	 * in localStorage and never reaches `resources/Cart.ts`, so before this it
+	 * could hold six of a product with three left until checkout 409'd. Running
+	 * the *same* `clampToStock` the server runs is the whole point of
+	 * `shared/cart.ts` existing.
+	 *
+	 * Convenience only — `Order.post` remains authoritative and still rejects.
+	 */
+	useEffect(() => {
+		if (username || !products) return;
+		const bySlug = new Map(products.map((product) => [product.slug, product]));
+		const { items, adjustments: clamped } = clampToStock(lines, (slug) => {
+			const product = bySlug.get(slug);
+			// A slug the catalog no longer knows is left alone rather than reported
+			// sold out: it may be unpublished rather than out of stock, and the
+			// derived `items` below already drops it silently.
+			return product ? availableStock(product) : Number.POSITIVE_INFINITY;
+		});
+		// Clamping is idempotent, so comparing the result guards the loop.
+		if (items.length === lines.length && items.every((item, i) => item.quantity === lines[i]?.quantity)) return;
+		setLines(items);
+		setAdjustments(clamped);
+	}, [lines, products, username]);
+
 	/** Apply a change locally, then let the server have the last word on stock. */
 	const commit = useCallback(
 		(next: CartLine[]) => {
@@ -172,6 +213,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 					price: product.price,
 					image: `/assets/cart/image-${product.slug}.jpg`,
 					quantity: line.quantity,
+					stock: product.stock,
+					lowStockThreshold: product.lowStockThreshold,
 				},
 			];
 		});
@@ -180,7 +223,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 			items,
 			total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
 			totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
-			adjustments,
+			adjustments: adjustments.map((adjustment) => ({
+				...adjustment,
+				shortName: bySlug.get(adjustment.slug)?.shortName ?? adjustment.slug,
+			})),
 			dismissAdjustments,
 			addItem,
 			setQuantity,

@@ -1,10 +1,13 @@
 import { BestGear } from '@/components/best-gear.tsx';
 import { CategoryLinks } from '@/components/category-links.tsx';
 import { QuantitySelector } from '@/components/quantity-selector.tsx';
+import { StockBadge } from '@/components/stock-badge.tsx';
 import { Button } from '@/components/ui/button.tsx';
 import { useCart } from '@/lib/cart.tsx';
-import { useProduct } from '@/lib/queries.ts';
+import { useProduct, useProducts } from '@/lib/queries.ts';
 import { formatPrice } from '@/lib/utils.ts';
+import { MAX_LINE_QUANTITY } from '@shared/cart.ts';
+import { isSoldOut, maxOrderable } from '@shared/inventory.ts';
 import { getRouteApi, Link, useRouter } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 
@@ -15,10 +18,20 @@ export function ProductPage() {
 	const router = useRouter();
 	const { addItem } = useCart();
 	const { data: product, isSuccess } = useProduct(slug);
+	// The whole catalog, from the same cached request `useProduct` reads — the
+	// `others` snapshots below carry no stock field, and joining against the
+	// catalog beats denormalizing a number that changes on every order.
+	const { data: catalog } = useProducts();
 	const [quantity, setQuantity] = useState(1);
+
+	const max = product ? maxOrderable(product) : MAX_LINE_QUANTITY;
 
 	// Reset quantity when navigating between product pages (same component, new slug).
 	useEffect(() => setQuantity(1), [slug]);
+
+	// Pull the quantity down if stock drops below it. Inert today; load-bearing
+	// once live stock updates push into this query.
+	useEffect(() => setQuantity((current) => Math.min(current, Math.max(1, max))), [max]);
 
 	// The query resolved but no product matched this slug.
 	if (isSuccess && !product) {
@@ -50,15 +63,20 @@ export function ProductPage() {
 						<img src={product.image.mobile} alt={product.name} className="w-full" />
 					</picture>
 					<div className="max-w-[445px]">
-						{product.new && <p className="text-overline">New product</p>}
+						<div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+							{product.new && <p className="text-overline">New product</p>}
+							<StockBadge product={product} />
+						</div>
 						<h1 className="mt-4 text-[28px] font-bold uppercase leading-8 tracking-[1px] sm:tracking-[1.43px] lg:mt-6 lg:text-[40px] lg:leading-[44px]">
 							{product.name}
 						</h1>
 						<p className="text-body mt-6 opacity-50 lg:mt-8">{product.description}</p>
 						<p className="mt-6 text-lg font-bold tracking-[1.29px] lg:mt-8">{formatPrice(product.price)}</p>
 						<div className="mt-8 flex items-center gap-4 lg:mt-[47px]">
-							<QuantitySelector value={quantity} onChange={(next) => setQuantity(Math.max(1, next))} />
-							<Button onClick={() => addItem(product, quantity)}>Add to Cart</Button>
+							<QuantitySelector value={quantity} min={1} max={max} onChange={setQuantity} />
+							<Button disabled={isSoldOut(product)} onClick={() => addItem(product, quantity)}>
+								{isSoldOut(product) ? 'Sold out' : 'Add to Cart'}
+							</Button>
 						</div>
 					</div>
 				</section>
@@ -114,21 +132,28 @@ export function ProductPage() {
 						You may also like
 					</h2>
 					<div className="mt-10 grid gap-14 sm:grid-cols-3 sm:gap-[11px] sm:gap-y-14 lg:mt-16 lg:gap-[30px]">
-						{product.others.map((other) => (
-							<div key={other.slug} className="text-center">
-								<picture className="block overflow-hidden rounded-lg bg-light">
-									<source media="(min-width: 1024px)" srcSet={other.image.desktop} />
-									<source media="(min-width: 640px)" srcSet={other.image.tablet} />
-									<img src={other.image.mobile} alt={other.name} className="w-full" />
-								</picture>
-								<h3 className="mt-8 text-2xl font-bold uppercase tracking-[1.71px] lg:mt-10">{other.shortName}</h3>
-								<Button asChild className="mt-8">
-									<Link to="/product/$slug" params={{ slug: other.slug }}>
-										See Product
-									</Link>
-								</Button>
-							</div>
-						))}
+						{product.others.map((other) => {
+							const record = catalog?.find((candidate) => candidate.slug === other.slug);
+							return (
+								<div key={other.slug} className="text-center">
+									<picture className="block overflow-hidden rounded-lg bg-light">
+										<source media="(min-width: 1024px)" srcSet={other.image.desktop} />
+										<source media="(min-width: 640px)" srcSet={other.image.tablet} />
+										<img src={other.image.mobile} alt={other.name} className="w-full" />
+									</picture>
+									<h3 className="mt-8 text-2xl font-bold uppercase tracking-[1.71px] lg:mt-10">{other.shortName}</h3>
+									{record && <StockBadge product={record} className="mt-2 block" />}
+									{/* The CTA stays enabled: a sold-out product is still worth reading
+									    about, and `disabled` on `<Button asChild>` is a silent no-op
+									    anyway (see the note in ui/button.tsx). */}
+									<Button asChild className="mt-8">
+										<Link to="/product/$slug" params={{ slug: other.slug }}>
+											See Product
+										</Link>
+									</Button>
+								</div>
+							);
+						})}
 					</div>
 				</section>
 			</div>

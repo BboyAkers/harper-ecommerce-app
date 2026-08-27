@@ -61,6 +61,9 @@ export interface CartItem {
 	price: number;
 	image: string;
 	quantity: number;
+	/** Carried from the catalog so the cart can bound its quantity control. */
+	stock?: number;
+	lowStockThreshold?: number;
 }
 
 export interface OrderCustomer {

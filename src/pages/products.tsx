@@ -1,5 +1,6 @@
 import { BestGear } from '@/components/best-gear.tsx';
 import { CategoryLinks } from '@/components/category-links.tsx';
+import { StockBadge } from '@/components/stock-badge.tsx';
 import { Button } from '@/components/ui/button.tsx';
 import { useProducts } from '@/lib/queries.ts';
 import { formatPrice } from '@/lib/utils.ts';
@@ -40,6 +41,7 @@ export function AllProductsPage() {
 									<div className="flex flex-wrap items-center gap-x-4 gap-y-1">
 										{product.new && <span className="text-overline text-[13px] tracking-[8px]">New product</span>}
 										<span className="text-subtitle opacity-50">{product.category}</span>
+										<StockBadge product={product} />
 									</div>
 									<h2 className="text-2xl font-bold uppercase tracking-[1px] sm:text-[28px] sm:leading-[32px] sm:tracking-[2px]">
 										{product.name}
