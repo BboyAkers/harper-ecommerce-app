@@ -62,15 +62,15 @@ export type NewListingRecord = Omit<Listing, 'id'>;
 export interface Order {
 	id: string;
 	createdAt?: string;
-	ownerUsername?: string;
 	customer?: OrderCustomer;
-	paymentMethod?: string;
 	eMoneyNumber?: string;
-	items?: OrderItem[];
-	total?: number;
-	shipping?: number;
-	vat?: number;
 	grandTotal?: number;
+	items?: OrderItem[];
+	ownerUsername?: string;
+	paymentMethod?: string;
+	shipping?: number;
+	total?: number;
+	vat?: number;
 }
 
 export type NewOrder = Omit<Order, 'id'>;
@@ -80,22 +80,22 @@ export type NewOrderRecord = Omit<Order, 'id'>;
 
 export interface Product {
 	id: string;
-	ord?: number;
-	slug?: string;
-	name?: string;
-	shortName?: string;
 	category?: string;
-	new?: boolean;
-	price?: number;
+	categoryImage?: ImageSet;
 	description?: string;
 	features?: string;
-	includes?: IncludedItem[];
-	image?: ImageSet;
-	categoryImage?: ImageSet;
 	gallery?: Gallery;
-	others?: RelatedProduct[];
-	stock?: number;
+	image?: ImageSet;
+	includes?: IncludedItem[];
 	lowStockThreshold?: number;
+	name?: string;
+	new?: boolean;
+	ord?: number;
+	others?: RelatedProduct[];
+	price?: number;
+	shortName?: string;
+	slug?: string;
+	stock?: number;
 }
 
 export type NewProduct = Omit<Product, 'id'>;
@@ -137,6 +137,61 @@ export type NewUser = Omit<User, 'id'>;
 export type { User as UserRecord };
 export type UserRecords = User[];
 export type NewUserRecord = Omit<User, 'id'>;
+
+export interface harper_ecommerce_app_Cart {
+	id: string;
+	items?: CartLine[];
+	updatedAt?: string;
+}
+
+export type harper_ecommerce_app_NewCart = Omit<harper_ecommerce_app_Cart, 'id'>;
+export type { harper_ecommerce_app_Cart as harper_ecommerce_app_CartRecord };
+export type harper_ecommerce_app_CartRecords = harper_ecommerce_app_Cart[];
+export type harper_ecommerce_app_NewCartRecord = Omit<harper_ecommerce_app_Cart, 'id'>;
+
+export interface harper_ecommerce_app_Order {
+	id: string;
+	createdAt?: string;
+	ownerUsername?: string;
+	customer?: OrderCustomer;
+	paymentMethod?: string;
+	eMoneyNumber?: string;
+	items?: OrderItem[];
+	total?: number;
+	shipping?: number;
+	vat?: number;
+	grandTotal?: number;
+}
+
+export type harper_ecommerce_app_NewOrder = Omit<harper_ecommerce_app_Order, 'id'>;
+export type { harper_ecommerce_app_Order as harper_ecommerce_app_OrderRecord };
+export type harper_ecommerce_app_OrderRecords = harper_ecommerce_app_Order[];
+export type harper_ecommerce_app_NewOrderRecord = Omit<harper_ecommerce_app_Order, 'id'>;
+
+export interface harper_ecommerce_app_Product {
+	id: string;
+	ord?: number;
+	slug?: string;
+	name?: string;
+	shortName?: string;
+	category?: string;
+	new?: boolean;
+	price?: number;
+	description?: string;
+	features?: string;
+	includes?: IncludedItem[];
+	image?: ImageSet;
+	categoryImage?: ImageSet;
+	gallery?: Gallery;
+	others?: RelatedProduct[];
+	stock?: number;
+	lowStockThreshold?: number;
+}
+
+export type harper_ecommerce_app_NewProduct = Omit<harper_ecommerce_app_Product, 'id'>;
+export type { harper_ecommerce_app_Product as harper_ecommerce_app_ProductRecord };
+export type harper_ecommerce_app_ProductRecords = harper_ecommerce_app_Product[];
+export type harper_ecommerce_app_NewProductRecord = Omit<harper_ecommerce_app_Product, 'id'>;
 
 export interface harperfast_vite_vite_build_info {
 	appName: string;
