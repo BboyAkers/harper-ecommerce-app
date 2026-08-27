@@ -23,7 +23,7 @@ type RelatedProduct {
 }
 
 # Not exported here: extended with public read access in resources/Product.ts.
-type Product @table {
+type Product @table(database: "harper_ecommerce_app") {
 	id: ID @primaryKey
 	ord: Int
 	slug: String @indexed

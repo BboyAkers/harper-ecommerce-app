@@ -1,4 +1,5 @@
 import { logger, server } from 'harper';
+import { DATABASE_NAME } from './tables.ts';
 
 /**
  * Application roles, created on startup if absent.
@@ -6,6 +7,10 @@ import { logger, server } from 'harper';
  * Harper permissions are table-level. Row-level scoping — "a customer reads
  * only their own orders" — is enforced by the resources via `rowFilter`, not
  * here; this grants the coarse capability and the resource narrows it.
+ *
+ * Grants are keyed by database, so naming the database in `tables.ts` changes
+ * the shape of every payload here. That coupling is the reason `DATABASE_NAME`
+ * is imported rather than the name being written out again.
  */
 
 export const CUSTOMER_ROLE = 'customer';
@@ -23,12 +28,16 @@ function grant(read: boolean, insert: boolean, update: boolean, remove: boolean)
 	return { read, insert, update, delete: remove, attribute_permissions: [] };
 }
 
+/** The grants for one database, as `add_role`/`alter_role` expect them. */
+interface DatabaseGrants {
+	tables: Record<string, TablePermission>;
+}
+
 interface RoleDefinition {
 	role: string;
-	permission: {
-		super_user: boolean;
-		data: { tables: Record<string, TablePermission> };
-	};
+	// `Record<typeof DATABASE_NAME, …>` rather than a literal key, so a rename in
+	// `tables.ts` is a type error here instead of a role that grants nothing.
+	permission: { super_user: boolean } & Record<typeof DATABASE_NAME, DatabaseGrants>;
 }
 
 const ROLES: RoleDefinition[] = [
@@ -37,7 +46,7 @@ const ROLES: RoleDefinition[] = [
 		role: CUSTOMER_ROLE,
 		permission: {
 			super_user: false,
-			data: {
+			[DATABASE_NAME]: {
 				tables: {
 					Product: grant(true, false, false, false),
 					Order: grant(true, true, false, false),
@@ -52,7 +61,7 @@ const ROLES: RoleDefinition[] = [
 		role: EDITOR_ROLE,
 		permission: {
 			super_user: false,
-			data: {
+			[DATABASE_NAME]: {
 				tables: {
 					Product: grant(true, true, true, true),
 					Order: grant(true, false, true, false),
@@ -68,7 +77,7 @@ const ROLES: RoleDefinition[] = [
 interface ExistingRole {
 	id: string;
 	role: string;
-	permission?: { data?: { tables?: Record<string, Partial<TablePermission>> } };
+	permission?: Partial<Record<typeof DATABASE_NAME, { tables?: Record<string, Partial<TablePermission>> }>>;
 }
 
 /**
@@ -79,8 +88,8 @@ interface ExistingRole {
  * check would rewrite every role on every boot.
  */
 function grantsAreCurrent(stored: ExistingRole, wanted: RoleDefinition): boolean {
-	const storedTables = stored.permission?.data?.tables ?? {};
-	return Object.entries(wanted.permission.data.tables).every(([table, grant]) => {
+	const storedTables = stored.permission?.[DATABASE_NAME]?.tables ?? {};
+	return Object.entries(wanted.permission[DATABASE_NAME].tables).every(([table, grant]) => {
 		const current = storedTables[table];
 		return (
 			current?.read === grant.read &&

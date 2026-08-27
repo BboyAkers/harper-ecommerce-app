@@ -1,4 +1,4 @@
-import { tables } from 'harper';
+import { tables } from './tables.ts';
 import type { Product } from '../../shared/types.ts';
 
 export {
