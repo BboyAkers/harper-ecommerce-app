@@ -27,6 +27,8 @@ sudo npx harper-integration-test-setup-loopback
 
 (See the package README for persisting these across reboots.)
 
+CI needs none of this. `.github/workflows/ci.yaml` runs on `ubuntu-latest`, which routes the whole `127.0.0.0/8` range already — so the integration step has no setup and no `sudo`. Please don't add one.
+
 ### Running without the loopback pool (no sudo)
 
 For a quick local run without configuring the pool, use a single-address pool on `127.0.0.1` and run sequentially:
