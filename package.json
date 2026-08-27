@@ -10,6 +10,7 @@
 		"lint": "eslint .",
 		"typecheck": "tsc --noEmit && tsc -p tsconfig.server.json",
 		"format": "prettier --write .",
+		"seed": "node scripts/seed.ts",
 		"test": "node --test test/*.test.ts",
 		"test:watch": "node --watch --test test/*.test.ts",
 		"test:integration": "harper-integration-test-run \"integrationTests/**/*.test.ts\"",

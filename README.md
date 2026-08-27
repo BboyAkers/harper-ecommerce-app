@@ -109,6 +109,48 @@ You should see the following:
 
 Take a look at the [default configuration](./config.yaml), which specifies how files are handled in your application.
 
+## Seeding demo data
+
+The catalog seeds itself. `config.yaml`'s `dataLoader` upserts
+[`data/products.json`](./data/products.json) on every boot, so six products are live as soon as
+Harper starts.
+
+Everything else a demo needs cannot be declared as table records — shoppers live in Harper's
+built-in `users` table, orders have to be _placed_ so that `Order.post` prices them from the
+catalog, and a cart is keyed by a username that must exist first. One script covers all three:
+
+```sh
+npm run seed
+```
+
+It drives the app's own endpoints (`/SignUp`, `/SignIn`, `/Order`, `/Cart/<username>`) over HTTP,
+so a successful run doubles as a smoke test of the validation, pricing and inventory paths. It
+needs no configuration against a local `npm run dev`, and it is safe to re-run — every step checks
+before it writes.
+
+You get two shoppers with order history, one of them with a saved server-side cart:
+
+| Account        | Password                | Has                                            |
+| :------------- | :---------------------- | :--------------------------------------------- |
+| `ada.lovelace` | `correct-horse-battery` | two orders                                     |
+| `grace.hopper` | `correct-horse-battery` | one order, plus a saved cart                   |
+| `editor.demo`  | `correct-horse-battery` | the `editor` role (admin credentials required) |
+
+Two steps need super_user, because `/SignUp` hard-codes the customer role on purpose — a
+self-serve endpoint must never be able to mint a privileged account. Set
+`HARPER_ADMIN_USERNAME` and `HARPER_ADMIN_PASSWORD` to create the editor account and to enable:
+
+```sh
+npm run seed -- --reset-stock
+```
+
+That re-asserts the stock levels `data/products.json` declares. It has its own flag because
+restarting Harper will _not_ do it: `dataLoader` skips records whose content hash still matches
+the file, and placing orders changes the table without changing the file. So once a demo has
+drained inventory, only an explicit write puts the sold-out and low-stock products back.
+
+`npm run seed -- --help` lists every environment variable.
+
 ## Deployment
 
 When you are ready, head to [https://fabric.harper.fast/](https://fabric.harper.fast/), log in to your account, and create a cluster.

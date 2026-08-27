@@ -22,7 +22,7 @@
 			"@shared/*": ["./shared/*"]
 		}
 	},
-	"include": ["resources", "shared"],
+	"include": ["resources", "scripts", "shared"],
 
 	/* integrationTests is excluded for now: the suites annotate node:test's
 	   callback parameter as @harperfast/integration-testing's `ContextWithHarper`,
