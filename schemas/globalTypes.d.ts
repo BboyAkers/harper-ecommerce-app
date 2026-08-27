@@ -4,7 +4,7 @@
  > harper dev .
  */
 import type { Table } from 'harperdb';
-import type { Agent, Cart, Listing, Order, Product, SavedSearch, TodoList, User, harperfast_vite_vite_build_info, house_listings_Listing, house_listings_ListingImage, mission_control_AppSetting, mission_control_CalendarEvent, mission_control_ChatMessage, mission_control_Content, mission_control_CrewAgent, mission_control_DriveFile, mission_control_Heartbeat, mission_control_JobRun, mission_control_MemoryEntry, mission_control_Project, mission_control_ProjectFile, mission_control_ReferenceArticle, mission_control_ResearchResult, mission_control_ScheduledJob, mission_control_WorkItem, mqtt_live_scoring_Match, mqtt_live_scoring_ScoreEvent, oauth_csrf_token, oauth_harper_oauth_mcp_client, oauth_harper_oauth_mcp_key, oauth_mcp_assertion_jti, oauth_mcp_auth_code, oauth_mcp_refresh_family, product_list_Product, url_shortener_Link } from './types.ts';
+import type { Agent, Cart, Listing, Order, Product, SavedSearch, TodoList, User, harper_ecommerce_app_Cart, harper_ecommerce_app_Order, harper_ecommerce_app_Product, harperfast_vite_vite_build_info, house_listings_Listing, house_listings_ListingImage, mission_control_AppSetting, mission_control_CalendarEvent, mission_control_ChatMessage, mission_control_Content, mission_control_CrewAgent, mission_control_DriveFile, mission_control_Heartbeat, mission_control_JobRun, mission_control_MemoryEntry, mission_control_Project, mission_control_ProjectFile, mission_control_ReferenceArticle, mission_control_ResearchResult, mission_control_ScheduledJob, mission_control_WorkItem, mqtt_live_scoring_Match, mqtt_live_scoring_ScoreEvent, oauth_csrf_token, oauth_harper_oauth_mcp_client, oauth_harper_oauth_mcp_key, oauth_mcp_assertion_jti, oauth_mcp_auth_code, oauth_mcp_refresh_family, product_list_Product, url_shortener_Link } from './types.ts';
 
 declare module 'harperdb' {
 	export const tables: {
@@ -28,6 +28,11 @@ declare module 'harperdb' {
 			SavedSearch: { new(...args: any[]): Table<SavedSearch> };
 			TodoList: { new(...args: any[]): Table<TodoList> };
 			User: { new(...args: any[]): Table<User> };
+		};
+		harper_ecommerce_app: {
+			Cart: { new(...args: any[]): Table<harper_ecommerce_app_Cart> };
+			Order: { new(...args: any[]): Table<harper_ecommerce_app_Order> };
+			Product: { new(...args: any[]): Table<harper_ecommerce_app_Product> };
 		};
 		harperfast_vite: {
 			vite_build_info: { new(...args: any[]): Table<harperfast_vite_vite_build_info> };
