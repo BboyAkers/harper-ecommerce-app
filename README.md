@@ -125,6 +125,22 @@ Then you can deploy your app to your cluster:
 npm run deploy
 ```
 
+### Deploying from CI
+
+`.github/workflows/deploy.yaml` deploys on every push to `main`. A runner has no saved
+`harper login` token and no `.env`, so it authenticates from two repository secrets. Generate
+both and store them in one step:
+
+```sh
+harper login --for-ci | gh secret set --env-file -
+```
+
+That prints `HARPER_CLI_TARGET` and `HARPER_CLI_REFRESH_TOKEN` on stdout in dotenv format and
+nothing else, so the token never reaches your screen or your shell history. The refresh token is
+the durable credential — the CLI mints a short-lived operation token from it on each run — so it
+is the only one that needs rotating. Log in as a user dedicated to CI rather than your own
+account, so revoking it costs you nothing.
+
 ## Keep Going!
 
 For more information about getting started with Harper and building applications, see our [getting started guide](https://docs.harperdb.io/docs).

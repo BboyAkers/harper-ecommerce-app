@@ -1,7 +1,10 @@
 # Deploys to the Harper Fabric cluster on every push to main.
 #
-# See ci.yaml for why this directory is plural — until it was renamed, this
-# workflow had never run, not even by manual dispatch.
+# Requires two repository secrets, HARPER_CLI_TARGET and HARPER_CLI_REFRESH_TOKEN.
+#
+# See ci.yaml for why this directory is plural. Until it was renamed nothing here had ever
+# run, not even by manual dispatch — which is why the missing credentials went unnoticed. The
+# trigger is live now, and the preflight step below names whichever secret is absent.
 name: Deploy to Harper Fabric
 on:
   workflow_dispatch:
@@ -42,5 +45,37 @@ jobs:
         run: npm run typecheck
       - name: Run unit tests
         run: npm test
+      # `harper deploy_component` needs a target and credentials; on a runner there is no
+      # `harper login` token and no `.env`, so both come from repository secrets.
+      #
+      # `harper login --for-ci` exists for exactly this and prints these two names in dotenv
+      # format, ready to pipe straight into a secret store:
+      #
+      #     harper login --for-ci | gh secret set --env-file -
+      #
+      # The refresh token is the durable half — the CLI mints a short-lived operation token
+      # from it on each run — so this is the only secret that needs rotating.
+      #
+      # Checked before the deploy rather than letting the CLI fail: with no target it falls
+      # back to localhost, and the resulting connection error reads like a broken cluster
+      # instead of an unset secret.
+      - name: Check deploy credentials are configured
+        env:
+          HARPER_CLI_TARGET: ${{ secrets.HARPER_CLI_TARGET }}
+          HARPER_CLI_REFRESH_TOKEN: ${{ secrets.HARPER_CLI_REFRESH_TOKEN }}
+        run: |
+          missing=()
+          [[ -n "$HARPER_CLI_TARGET" ]] || missing+=(HARPER_CLI_TARGET)
+          [[ -n "$HARPER_CLI_REFRESH_TOKEN" ]] || missing+=(HARPER_CLI_REFRESH_TOKEN)
+          if (( ${#missing[@]} )); then
+            echo "::error::Missing repository secret(s): ${missing[*]}. Generate both with 'harper login --for-ci | gh secret set --env-file -'."
+            exit 1
+          fi
+      # Do not mix in CLI_TARGET_* here. The CLI picks whichever namespace supplies anything
+      # and owns both halves deliberately, so a HARPER_CLI_TARGET paired with a
+      # CLI_TARGET_REFRESH_TOKEN would authenticate as the wrong identity rather than error.
       - name: Build & deploy
+        env:
+          HARPER_CLI_TARGET: ${{ secrets.HARPER_CLI_TARGET }}
+          HARPER_CLI_REFRESH_TOKEN: ${{ secrets.HARPER_CLI_REFRESH_TOKEN }}
         run: npm run deploy
