@@ -1,4 +1,4 @@
-import { tables } from 'harper';
+import { tables } from './lib/tables.ts';
 import { type CartAdjustment, type CartLine, clampToStock, isValidLine, mergeCartLines } from '../shared/cart.ts';
 import { availableStock, getProductBySlug } from './lib/catalog.ts';
 import { badRequest, notFound } from './lib/errors.ts';

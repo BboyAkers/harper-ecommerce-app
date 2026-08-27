@@ -85,12 +85,16 @@ suite('cart', (ctx: ContextWithHarper) => {
 			headers: { 'Content-Type': 'application/json', Authorization: adminAuth(ctx.harper) },
 			body: JSON.stringify({ operation: 'list_roles' }),
 		});
+		// Grants are keyed by database, and this app declares
+		// `@table(database: "harper_ecommerce_app")` rather than using Harper's default `data`.
+		// The name is spelled out rather than imported from `resources/lib/tables.ts`: a test that
+		// reads the constant it is checking would follow a rename instead of catching one.
 		const roles = (await response.json()) as {
 			role: string;
-			permission?: { data?: { tables?: Record<string, { read?: boolean; insert?: boolean }> } };
+			permission?: Record<string, { tables?: Record<string, { read?: boolean; insert?: boolean }> }>;
 		}[];
 		for (const name of ['customer', 'editor']) {
-			const cart = roles.find((role) => role.role === name)?.permission?.data?.tables?.Cart;
+			const cart = roles.find((role) => role.role === name)?.permission?.harper_ecommerce_app?.tables?.Cart;
 			ok(cart?.read && cart?.insert, `the ${name} role should be able to use a Cart, got ${JSON.stringify(cart)}`);
 		}
 	});

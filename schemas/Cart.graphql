@@ -9,7 +9,7 @@ type CartLine {
 #
 # Guests have no record here — their cart lives in localStorage until they sign
 # in, at which point it is merged in (see src/lib/cart.tsx).
-type Cart @table {
+type Cart @table(database: "harper_ecommerce_app") {
 	id: ID @primaryKey
 	items: [CartLine]
 	updatedAt: Date @updatedTime

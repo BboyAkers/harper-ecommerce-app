@@ -1,4 +1,5 @@
-import { type RequestTarget, tables } from 'harper';
+import type { RequestTarget } from 'harper';
+import { tables } from './lib/tables.ts';
 import { computeTotals } from '../shared/pricing.ts';
 import type { OrderRecord } from '../shared/types.ts';
 import { availableStock, getProductBySlug, type ProductRecord } from './lib/catalog.ts';
