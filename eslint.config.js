@@ -18,6 +18,7 @@ export default [
 		},
 	},
 	{
-		ignores: ['node_modules/'],
+		// Build output and the generated schema types are not hand-written source.
+		ignores: ['node_modules/', 'dist/', 'schemas/types.ts', 'schemas/globalTypes.d.ts'],
 	},
 ];

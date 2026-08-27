@@ -1,4 +1,4 @@
-import { createOrder, fetchProducts } from '@/lib/api.ts';
+import { createOrder, fetchMyOrders, fetchProducts } from '@/lib/api.ts';
 import type { Product } from '@/lib/types.ts';
 import { queryOptions, useMutation, useQuery } from '@tanstack/react-query';
 
@@ -32,4 +32,21 @@ export function useProductsByCategory(category: string) {
 
 export function useCreateOrder() {
 	return useMutation({ mutationFn: createOrder });
+}
+
+/**
+ * The signed-in customer's order history.
+ *
+ * Scoping happens in `resources/Order.ts`, so this asks for nothing
+ * user-specific and the key carries no username — signing out clears the cache
+ * (see `src/lib/auth.tsx`) rather than keying around it.
+ */
+export const ordersQueryOptions = queryOptions({
+	queryKey: ['orders'],
+	queryFn: fetchMyOrders,
+	retry: false,
+});
+
+export function useMyOrders(enabled: boolean) {
+	return useQuery({ ...ordersQueryOptions, enabled });
 }

@@ -15,7 +15,11 @@ rest: true
 graphqlSchema:
   files: 'schemas/*.graphql'
 
-# Seeds tables from JSON files on startup (records are upserted by content hash)
+# Seeds tables from JSON files on startup (records are upserted by content hash).
+# Each file must name the database it targets — our tables live in `harper_ecommerce_app`,
+# not Harper's default `data`. Omit the key and the loader infers a table from the first
+# record and creates it under `data`, so the seed lands in the wrong place and the real
+# table stays empty. No error, which is worse than a failed boot.
 dataLoader:
   files: 'data/*.json'
 

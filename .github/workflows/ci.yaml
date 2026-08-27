@@ -1,0 +1,67 @@
+# Verification gate for every push and pull request.
+#
+# NOTE ON THIS DIRECTORY: GitHub only reads `.github/workflows/` — plural. This
+# repo carried its workflow in `.github/workflow/` from the initial commit, so
+# nothing here had ever run, including the `workflow_dispatch` on deploy.yaml
+# that looked like it should have worked manually. If you add a workflow, it
+# belongs here.
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  # Per-ref, unlike deploy.yaml's single `main` group: PR checks should not
+  # serialize behind each other, and a superseded run is wasted work.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - name: Set up Node.js
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          cache: 'npm'
+          node-version-file: '.nvmrc'
+      # `npm ci` is stricter than `npm install` and stricter than older npm releases:
+      # 11.8.0 (the npm bundled with the Node in .nvmrc) requires the lock to record
+      # optional-dependency subtrees that 11.6.1 happily omitted, and refuses to install
+      # otherwise. Regenerate package-lock.json with .nvmrc's Node, not whatever is on
+      # your PATH, or this step fails before a single test runs.
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      # Nothing ran the frontend build before. `npm run deploy` ships source and
+      # lets @harperfast/vite build on the cluster, so a broken build would
+      # otherwise reach Fabric before anyone noticed locally.
+      - name: Build frontend
+        run: npm run build
+      # These boot real Harper, each instance binding its own loopback address.
+      # Linux routes all of 127.0.0.0/8 by default, so CI needs no
+      # `harper-integration-test-setup-loopback` step — that is a macOS/Windows
+      # requirement only (see integrationTests/README.md). Do not add a sudo step.
+      - name: Integration tests
+        run: npm run test:integration
+        env:
+          HARPER_INTEGRATION_TEST_LOG_DIR: ${{ runner.temp }}/harper-logs
+      # A failed suite is close to undiagnosable without the instance logs, and
+      # they live in a temp dir that dies with the runner.
+      - name: Upload Harper logs on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: harper-logs
+          path: ${{ runner.temp }}/harper-logs
+          if-no-files-found: ignore

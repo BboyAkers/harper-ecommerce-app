@@ -59,7 +59,9 @@ export async function buildAppFixture(): Promise<string> {
 	await writeFile(join(dir, 'config.yaml'), FIXTURE_CONFIG);
 	// The config globs (schemas/*.graphql, resources/*.ts, data/*.json) select what actually
 	// loads, so copying the directories wholesale is fine — the real source is the single truth.
-	for (const sub of ['schemas', 'resources', 'data']) {
+	// `shared/` carries no plugin entry but must come along: the resources import the pricing
+	// and inventory rules from it, and Harper resolves those at load time.
+	for (const sub of ['schemas', 'resources', 'data', 'shared']) {
 		await cp(join(projectRoot, sub), join(dir, sub), { recursive: true });
 	}
 	return dir;
@@ -107,6 +109,44 @@ export function postJson(harper: HarperContext, path: string, body: unknown, opt
 	const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
 	if (opts.auth) headers.Authorization = adminAuth(harper);
 	return fetch(restUrl(harper, path), { method: 'POST', headers, body: JSON.stringify(body) });
+}
+
+/**
+ * Run an operations-API call as the instance admin.
+ *
+ * The harness's own `sendOperation` sends no credentials, which is fine while
+ * `authorizeLocal` is on (every loopback call is super_user) but fails with
+ * "Must login" in suites that turn the bypass off.
+ */
+export async function adminOperation(harper: HarperContext, operation: Record<string, unknown>) {
+	const response = await fetch(harper.operationsAPIURL, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Accept: 'application/json',
+			Authorization: adminAuth(harper),
+		},
+		body: JSON.stringify(operation),
+	});
+	if (!response.ok) throw new Error(`operation ${operation.operation} failed: ${response.status}`);
+	return response.json();
+}
+
+/** Send a JSON body with an arbitrary method (PUT/PATCH/DELETE). */
+export function sendJson(
+	harper: HarperContext,
+	method: string,
+	path: string,
+	body?: unknown,
+	opts: { auth?: boolean } = {},
+) {
+	const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
+	if (opts.auth) headers.Authorization = adminAuth(harper);
+	return fetch(restUrl(harper, path), {
+		method,
+		headers,
+		body: body === undefined ? undefined : JSON.stringify(body),
+	});
 }
 
 /** A valid customer block for order-creation tests. */

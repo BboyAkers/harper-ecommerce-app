@@ -1,0 +1,81 @@
+# Deploys to the Harper Fabric cluster on every push to main.
+#
+# Requires two repository secrets, HARPER_CLI_TARGET and HARPER_CLI_REFRESH_TOKEN.
+#
+# See ci.yaml for why this directory is plural. Until it was renamed nothing here had ever
+# run, not even by manual dispatch — which is why the missing credentials went unnoticed. The
+# trigger is live now, and the preflight step below names whichever secret is absent.
+name: Deploy to Harper Fabric
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  # A single group with cancel-in-progress off, so two merges to main queue
+  # rather than racing each other onto the cluster.
+  group: main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Set up Node.js
+        uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          cache: 'npm'
+          node-version-file: '.nvmrc'
+      - name: Install dependencies
+        run: npm ci
+      # Re-verified here rather than trusting the CI run on the same commit:
+      # this job pushes to a live cluster, and the cost of the duplicate work is
+      # far below the cost of deploying an untested merge. The integration
+      # suites are deliberately left to ci.yaml — they take minutes and have
+      # already gated the pull request.
+      - name: Run lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Run unit tests
+        run: npm test
+      # `harper deploy_component` needs a target and credentials; on a runner there is no
+      # `harper login` token and no `.env`, so both come from repository secrets.
+      #
+      # `harper login --for-ci` exists for exactly this and prints these two names in dotenv
+      # format, ready to pipe straight into a secret store:
+      #
+      #     harper login --for-ci | gh secret set --env-file -
+      #
+      # The refresh token is the durable half — the CLI mints a short-lived operation token
+      # from it on each run — so this is the only secret that needs rotating.
+      #
+      # Checked before the deploy rather than letting the CLI fail: with no target it falls
+      # back to localhost, and the resulting connection error reads like a broken cluster
+      # instead of an unset secret.
+      - name: Check deploy credentials are configured
+        env:
+          HARPER_CLI_TARGET: ${{ secrets.HARPER_CLI_TARGET }}
+          HARPER_CLI_REFRESH_TOKEN: ${{ secrets.HARPER_CLI_REFRESH_TOKEN }}
+        run: |
+          missing=()
+          [[ -n "$HARPER_CLI_TARGET" ]] || missing+=(HARPER_CLI_TARGET)
+          [[ -n "$HARPER_CLI_REFRESH_TOKEN" ]] || missing+=(HARPER_CLI_REFRESH_TOKEN)
+          if (( ${#missing[@]} )); then
+            echo "::error::Missing repository secret(s): ${missing[*]}. Generate both with 'harper login --for-ci | gh secret set --env-file -'."
+            exit 1
+          fi
+      # Do not mix in CLI_TARGET_* here. The CLI picks whichever namespace supplies anything
+      # and owns both halves deliberately, so a HARPER_CLI_TARGET paired with a
+      # CLI_TARGET_REFRESH_TOKEN would authenticate as the wrong identity rather than error.
+      - name: Build & deploy
+        env:
+          HARPER_CLI_TARGET: ${{ secrets.HARPER_CLI_TARGET }}
+          HARPER_CLI_REFRESH_TOKEN: ${{ secrets.HARPER_CLI_REFRESH_TOKEN }}
+        run: npm run deploy

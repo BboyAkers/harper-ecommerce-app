@@ -1,0 +1,33 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ES2023"],
+		"types": ["node"],
+
+		/* Harper runs these files directly via Node's type stripping, so nothing
+		   is emitted and local imports carry explicit .ts extensions. */
+		"allowImportingTsExtensions": true,
+		"verbatimModuleSyntax": true,
+		"erasableSyntaxOnly": true,
+		"noEmit": true,
+
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"paths": {
+			"@shared/*": ["./shared/*"]
+		}
+	},
+	"include": ["resources", "shared"],
+
+	/* integrationTests is excluded for now: the suites annotate node:test's
+	   callback parameter as @harperfast/integration-testing's `ContextWithHarper`,
+	   which the harness populates at runtime but which node:test types as the
+	   narrower `SuiteContext`. The tests run correctly; only the static check
+	   disagrees. Re-include once the harness ships a compatible `suite` wrapper. */
+	"exclude": ["integrationTests"]
+}

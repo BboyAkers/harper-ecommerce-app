@@ -1,4 +1,5 @@
 {
+	"database": "harper_ecommerce_app",
 	"table": "Product",
 	"records": [
 		{
@@ -92,7 +93,8 @@
 						"desktop": "/assets/shared/desktop/image-zx9-speaker.jpg"
 					}
 				}
-			]
+			],
+			"stock": 42
 		},
 		{
 			"id": "xx59-headphones",
@@ -181,7 +183,8 @@
 						"desktop": "/assets/shared/desktop/image-zx9-speaker.jpg"
 					}
 				}
-			]
+			],
+			"stock": 3
 		},
 		{
 			"id": "xx99-mark-one-headphones",
@@ -270,7 +273,8 @@
 						"desktop": "/assets/shared/desktop/image-zx9-speaker.jpg"
 					}
 				}
-			]
+			],
+			"stock": 0
 		},
 		{
 			"id": "xx99-mark-two-headphones",
@@ -363,7 +367,8 @@
 						"desktop": "/assets/shared/desktop/image-zx9-speaker.jpg"
 					}
 				}
-			]
+			],
+			"stock": 18
 		},
 		{
 			"id": "zx7-speaker",
@@ -456,7 +461,8 @@
 						"desktop": "/assets/shared/desktop/image-xx59-headphones.jpg"
 					}
 				}
-			]
+			],
+			"stock": 7
 		},
 		{
 			"id": "zx9-speaker",
@@ -549,7 +555,9 @@
 						"desktop": "/assets/shared/desktop/image-xx59-headphones.jpg"
 					}
 				}
-			]
+			],
+			"stock": 8,
+			"lowStockThreshold": 10
 		}
 	]
 }
