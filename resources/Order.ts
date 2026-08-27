@@ -1,4 +1,4 @@
-import type { RequestTarget } from 'harper';
+import type { RequestTarget, SubscriptionRequest } from 'harper';
 import { tables } from './lib/tables.ts';
 import { computeTotals } from '../shared/pricing.ts';
 import type { OrderRecord } from '../shared/types.ts';
@@ -171,8 +171,10 @@ export class Order extends tables.Order {
 	 * `rowFilter` is evaluated during query execution *and* against the final
 	 * materialized record, so it cannot be sidestepped by crafting conditions —
 	 * unlike appending an `ownerUsername` condition, which a client-supplied
-	 * condition could contradict. Harper runs the same predicate over subscription
-	 * events, so a WebSocket subscriber is scoped by this too.
+	 * condition could contradict.
+	 *
+	 * This covers REST reads only. `connect()` dispatches straight to `subscribe()`
+	 * and never calls `search()`, so live subscriptions are scoped separately below.
 	 */
 	search(target: RequestTarget) {
 		const user = requireUser(this.getCurrentUser(), 'Sign in to view your orders');
@@ -181,6 +183,31 @@ export class Order extends tables.Order {
 			target.rowFilter = (record: Partial<OrderRecord>) => record?.ownerUsername === username;
 		}
 		return super.search(target);
+	}
+
+	/**
+	 * Scope live subscriptions to the caller's own orders.
+	 *
+	 * This is a separate override rather than something `search()` covers, because
+	 * `Resource.connect()` calls `subscribe()` directly and never routes through
+	 * `search()` or `get()` — the only authorization on that path is `allowRead`,
+	 * which for Order is the role's table-level grant. Without this, any signed-in
+	 * customer could subscribe to any other customer's order.
+	 *
+	 * `rowFilter` must stay synchronous: Table.subscribe throws
+	 * `rowFilter must be synchronous` on an AsyncFunction.
+	 */
+	async subscribe(request: SubscriptionRequest) {
+		const user = requireUser(this.getCurrentUser(), 'Sign in to watch your orders');
+		if (!isSuperUser(user)) {
+			const { username } = user;
+			// A single-record subscription needs an answer up front: a `rowFilter`
+			// would just yield nothing, which a client cannot tell apart from "no
+			// updates yet". `get` already 404s someone else's order, so reuse it.
+			if (!(request as RequestTarget)?.isCollection) await this.get(request);
+			request.rowFilter = (record: Partial<OrderRecord>) => record?.ownerUsername === username;
+		}
+		return super.subscribe(request);
 	}
 
 	/**

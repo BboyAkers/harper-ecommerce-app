@@ -42,10 +42,12 @@
 		"@types/node": "^24.10.1",
 		"@types/react": "^19.2.10",
 		"@types/react-dom": "^19.2.3",
+		"@types/ws": "^8.18.1",
 		"eslint": "^10.0.2",
 		"globals": "^17.4.0",
-		"harper": "^5.1.20",
+		"harper": "~5.2.5",
 		"prettier": "^3.8.1",
-		"typescript": "~6.0.0"
+		"typescript": "~6.0.0",
+		"ws": "^8.21.3"
 	}
 }

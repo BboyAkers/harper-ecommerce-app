@@ -1,5 +1,6 @@
 import { BestGear } from '@/components/best-gear.tsx';
 import { CategoryLinks } from '@/components/category-links.tsx';
+import { StockBadge } from '@/components/stock-badge.tsx';
 import { Button } from '@/components/ui/button.tsx';
 import { useProductsByCategory } from '@/lib/queries.ts';
 import { cn } from '@/lib/utils.ts';
@@ -35,7 +36,12 @@ export function CategoryPage() {
 							<img src={product.categoryImage.mobile} alt={product.name} className="w-full" />
 						</picture>
 						<div className="mx-auto max-w-[573px] text-center lg:max-w-[445px] lg:text-left">
-							{product.new && <p className="text-overline">New product</p>}
+							{/* Centered on mobile, left at lg — the eyebrow row has to follow the
+							    column's alignment rather than pick its own. */}
+							<div className="flex flex-wrap items-baseline justify-center gap-x-4 gap-y-1 lg:justify-start">
+								{product.new && <p className="text-overline">New product</p>}
+								<StockBadge product={product} />
+							</div>
 							<h2 className="mt-6 text-[28px] font-bold uppercase leading-[38px] tracking-[1px] sm:text-[40px] sm:leading-[44px] sm:tracking-[1.43px]">
 								{product.name}
 							</h2>
