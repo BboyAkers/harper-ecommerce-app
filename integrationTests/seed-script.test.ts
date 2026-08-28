@@ -21,10 +21,14 @@ import { after, before, suite, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { restUrl, startAppHarper } from './helpers/app-fixture.ts';
-import { get } from './helpers/session.ts';
+import { cartPath, get } from './helpers/session.ts';
 
 const execFileAsync = promisify(execFile);
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** The accounts `scripts/seed.ts` creates — email addresses, since that is what an account is. */
+const GRACE = 'grace@example.com';
+const SEEDED_ACCOUNTS = ['ada@example.com', GRACE, 'editor@example.com'];
 
 interface SeedRun {
 	stdout: string;
@@ -69,8 +73,8 @@ suite('seed script', (ctx: ContextWithHarper) => {
 	});
 
 	test('creates the shoppers and the editor on a first run', () => {
-		for (const username of ['ada.lovelace', 'grace.hopper', 'editor.demo']) {
-			ok(first.stdout.includes(`created ${username}`), `expected to create ${username}:\n${first.stdout}`);
+		for (const account of SEEDED_ACCOUNTS) {
+			ok(first.stdout.includes(`created ${account}`), `expected to create ${account}:\n${first.stdout}`);
 		}
 	});
 
@@ -80,7 +84,7 @@ suite('seed script', (ctx: ContextWithHarper) => {
 	});
 
 	test('gives a shopper a saved server-side cart', async () => {
-		const response = await get(ctx.harper, '/Cart/grace.hopper', undefined);
+		const response = await get(ctx.harper, cartPath(GRACE), undefined);
 		// Anonymous reads are refused, which is the cart's whole authorization story —
 		// so assert through the owner's own session instead.
 		strictEqual(response.status, 401);
@@ -88,12 +92,12 @@ suite('seed script', (ctx: ContextWithHarper) => {
 		const signIn = await fetch(restUrl(ctx.harper, '/SignIn'), {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ username: 'grace.hopper', password: 'correct-horse-battery' }),
+			body: JSON.stringify({ email: GRACE, password: 'correct-horse-battery' }),
 		});
 		ok(signIn.ok, `seeded shopper should be able to sign in, got ${signIn.status}`);
 		const cookie = signIn.headers.get('set-cookie')?.split(';')[0];
 
-		const cart = (await (await get(ctx.harper, '/Cart/grace.hopper', cookie)).json()) as {
+		const cart = (await (await get(ctx.harper, cartPath(GRACE), cookie)).json()) as {
 			items: { slug: string; quantity: number }[];
 		};
 		strictEqual(cart.items.length, 2, JSON.stringify(cart));
@@ -116,8 +120,8 @@ suite('seed script', (ctx: ContextWithHarper) => {
 	test('is idempotent: a second run creates nothing and places no orders', () => {
 		ok(!second.stdout.includes('✓ created'), `second run should create nothing:\n${second.stdout}`);
 		ok(!second.stdout.includes('✓ placed'), `second run should place no orders:\n${second.stdout}`);
-		for (const username of ['ada.lovelace', 'grace.hopper', 'editor.demo']) {
-			ok(second.stdout.includes(`${username} already exists`), `expected ${username} to be skipped`);
+		for (const account of SEEDED_ACCOUNTS) {
+			ok(second.stdout.includes(`${account} already exists`), `expected ${account} to be skipped`);
 		}
 		ok(second.stdout.includes('already has 2 order(s)'), 'ada should be reported as already having history');
 	});

@@ -36,9 +36,19 @@ export function get(harper: HarperContext, path: string, cookie?: string) {
 	return fetch(restUrl(harper, path), { headers });
 }
 
-/** Register a customer and return its session cookie. */
-export async function register(harper: HarperContext, username: string) {
-	const { response, cookie } = await post(harper, '/SignUp', { username, password: PASSWORD });
+/**
+ * Register a customer and return its session cookie.
+ *
+ * The identity is an email address — `/SignUp` requires one and stores it as the
+ * Harper username, so it is also the id of the account's cart and orders.
+ */
+export async function register(harper: HarperContext, email: string) {
+	const { response, cookie } = await post(harper, '/SignUp', { email, password: PASSWORD });
 	ok(response.ok, `sign-up should succeed, got ${response.status}`);
 	return cookie;
+}
+
+/** Address a cart by its owner's email; the `@` has to be percent-encoded in a path. */
+export function cartPath(email: string) {
+	return `/Cart/${encodeURIComponent(email)}`;
 }

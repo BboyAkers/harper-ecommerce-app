@@ -1,18 +1,19 @@
 /**
  * Integration tests for the server-side cart.
  *
- * The cart is keyed by username, so "you may only touch your own" is a string
- * comparison rather than a lookup — but that only holds while the resource
- * actually reads the username from the session. Like the auth and order-scoping
- * suites, this runs with `authorizeLocal: false`, since otherwise every request
- * from this loopback process would be super_user and allowed to touch any cart.
+ * The cart is keyed by the owner's email — the address `/SignUp` stored as their
+ * Harper username — so "you may only touch your own" is a string comparison
+ * rather than a lookup. That only holds while the resource actually reads the
+ * username from the session. Like the auth and order-scoping suites, this runs
+ * with `authorizeLocal: false`, since otherwise every request from this loopback
+ * process would be super_user and allowed to touch any cart.
  */
 import { teardownHarper, type ContextWithHarper, type HarperContext } from '@harperfast/integration-testing';
 import { ok, strictEqual } from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import { after, before, suite, test } from 'node:test';
 import { adminAuth, restUrl, startAppHarper } from './helpers/app-fixture.ts';
-import { get, post, register } from './helpers/session.ts';
+import { cartPath, get, post, register } from './helpers/session.ts';
 
 interface CartLine {
 	slug: string;
@@ -41,19 +42,22 @@ function send(harper: HarperContext, method: string, path: string, body?: unknow
 }
 
 /** PUT a cart and return the parsed result, asserting success. */
-async function putCart(harper: HarperContext, username: string, items: CartLine[], cookie?: string) {
-	const response = await send(harper, 'PUT', `/Cart/${username}`, { items }, cookie);
+async function putCart(harper: HarperContext, owner: string, items: CartLine[], cookie?: string) {
+	const response = await send(harper, 'PUT', cartPath(owner), { items }, cookie);
 	const body = await response.text();
 	ok(response.ok, `cart write should succeed, got ${response.status}: ${body}`);
 	return JSON.parse(body) as CartResult;
 }
 
-async function readCart(harper: HarperContext, username: string, cookie?: string) {
-	const response = await get(harper, `/Cart/${username}`, cookie);
+async function readCart(harper: HarperContext, owner: string, cookie?: string) {
+	const response = await get(harper, cartPath(owner), cookie);
 	const body = await response.text();
 	strictEqual(response.status, 200, `cart read should succeed, got ${response.status}: ${body}`);
 	return JSON.parse(body) as CartResult;
 }
+
+const ADA = 'ada.cart@example.com';
+const BOB = 'bob.cart@example.com';
 
 suite('cart', (ctx: ContextWithHarper) => {
 	let fixtureDir: string;
@@ -64,8 +68,8 @@ suite('cart', (ctx: ContextWithHarper) => {
 		({ fixtureDir } = await startAppHarper(ctx, {
 			config: { authentication: { authorizeLocal: false } },
 		}));
-		ada = await register(ctx.harper, 'ada.cart');
-		bob = await register(ctx.harper, 'bob.cart');
+		ada = await register(ctx.harper, ADA);
+		bob = await register(ctx.harper, BOB);
 	});
 
 	after(async () => {
@@ -100,14 +104,14 @@ suite('cart', (ctx: ContextWithHarper) => {
 	});
 
 	test('starts a customer with an empty cart rather than a 404', async () => {
-		const cart = await readCart(ctx.harper, 'ada.cart', ada);
-		strictEqual(cart.id, 'ada.cart');
+		const cart = await readCart(ctx.harper, ADA, ada);
+		strictEqual(cart.id, ADA);
 		strictEqual(cart.items.length, 0);
 	});
 
 	test('stores and reads back a cart', async () => {
-		await putCart(ctx.harper, 'ada.cart', [{ slug: IN_STOCK, quantity: 2 }], ada);
-		const cart = await readCart(ctx.harper, 'ada.cart', ada);
+		await putCart(ctx.harper, ADA, [{ slug: IN_STOCK, quantity: 2 }], ada);
+		const cart = await readCart(ctx.harper, ADA, ada);
 		strictEqual(cart.items.length, 1);
 		strictEqual(cart.items[0].slug, IN_STOCK);
 		strictEqual(cart.items[0].quantity, 2);
@@ -117,18 +121,18 @@ suite('cart', (ctx: ContextWithHarper) => {
 		// A cart that remembered a price would be a cart that could quote a stale one.
 		await putCart(
 			ctx.harper,
-			'ada.cart',
+			ADA,
 			[{ slug: IN_STOCK, quantity: 1, price: 1, shortName: 'free stuff' } as CartLine],
 			ada,
 		);
-		const cart = await readCart(ctx.harper, 'ada.cart', ada);
+		const cart = await readCart(ctx.harper, ADA, ada);
 		strictEqual(Object.keys(cart.items[0]).sort().join(','), 'quantity,slug');
 	});
 
 	test('replaces the whole cart on PUT', async () => {
-		await putCart(ctx.harper, 'ada.cart', [{ slug: IN_STOCK, quantity: 2 }], ada);
-		await putCart(ctx.harper, 'ada.cart', [{ slug: LOW_STOCK, quantity: 1 }], ada);
-		const cart = await readCart(ctx.harper, 'ada.cart', ada);
+		await putCart(ctx.harper, ADA, [{ slug: IN_STOCK, quantity: 2 }], ada);
+		await putCart(ctx.harper, ADA, [{ slug: LOW_STOCK, quantity: 1 }], ada);
+		const cart = await readCart(ctx.harper, ADA, ada);
 		strictEqual(cart.items.length, 1);
 		strictEqual(cart.items[0].slug, LOW_STOCK);
 	});
@@ -136,7 +140,7 @@ suite('cart', (ctx: ContextWithHarper) => {
 	test('clamps a quantity above stock instead of rejecting the write', async () => {
 		// Rejecting would strand a customer whose cart went stale: they could not
 		// even remove the offending line.
-		const result = await putCart(ctx.harper, 'ada.cart', [{ slug: LOW_STOCK, quantity: 9 }], ada);
+		const result = await putCart(ctx.harper, ADA, [{ slug: LOW_STOCK, quantity: 9 }], ada);
 		strictEqual(result.items[0].quantity, 3, 'should clamp to the seeded stock level');
 		strictEqual(result.adjustments.length, 1);
 		strictEqual(result.adjustments[0].slug, LOW_STOCK);
@@ -145,30 +149,30 @@ suite('cart', (ctx: ContextWithHarper) => {
 	});
 
 	test('drops a sold-out product from the cart', async () => {
-		const result = await putCart(ctx.harper, 'ada.cart', [{ slug: SOLD_OUT, quantity: 1 }], ada);
+		const result = await putCart(ctx.harper, ADA, [{ slug: SOLD_OUT, quantity: 1 }], ada);
 		strictEqual(result.items.length, 0);
 		strictEqual(result.adjustments[0].available, 0);
 	});
 
 	test('rejects an unknown slug with 400', async () => {
-		const response = await send(ctx.harper, 'PUT', '/Cart/ada.cart', { items: [{ slug: 'no-such', quantity: 1 }] }, ada);
+		const response = await send(ctx.harper, 'PUT', cartPath(ADA), { items: [{ slug: 'no-such', quantity: 1 }] }, ada);
 		strictEqual(response.status, 400);
 	});
 
 	test('rejects a malformed quantity with 400', async () => {
 		for (const quantity of [0, -1, 1.5, 100, 'two']) {
-			const response = await send(ctx.harper, 'PUT', '/Cart/ada.cart', { items: [{ slug: IN_STOCK, quantity }] }, ada);
+			const response = await send(ctx.harper, 'PUT', cartPath(ADA), { items: [{ slug: IN_STOCK, quantity }] }, ada);
 			strictEqual(response.status, 400, `quantity ${quantity} should be rejected`);
 		}
 	});
 
 	test('merges a guest cart into the stored one on POST, keeping the larger quantity', async () => {
-		await putCart(ctx.harper, 'bob.cart', [{ slug: IN_STOCK, quantity: 2 }], bob);
+		await putCart(ctx.harper, BOB, [{ slug: IN_STOCK, quantity: 2 }], bob);
 
 		const response = await send(
 			ctx.harper,
 			'POST',
-			'/Cart/bob.cart',
+			cartPath(BOB),
 			{
 				items: [
 					{ slug: IN_STOCK, quantity: 1 },
@@ -189,62 +193,62 @@ suite('cart', (ctx: ContextWithHarper) => {
 	test('discards the cart on DELETE and still reads back as empty', async () => {
 		// The row is removed, but a missing cart and an empty cart look the same to
 		// a client, so nothing downstream has to care which it is.
-		await putCart(ctx.harper, 'bob.cart', [{ slug: IN_STOCK, quantity: 1 }], bob);
-		const response = await send(ctx.harper, 'DELETE', '/Cart/bob.cart', undefined, bob);
+		await putCart(ctx.harper, BOB, [{ slug: IN_STOCK, quantity: 1 }], bob);
+		const response = await send(ctx.harper, 'DELETE', cartPath(BOB), undefined, bob);
 		ok(response.ok, `delete should succeed, got ${response.status}`);
 
-		const cart = await readCart(ctx.harper, 'bob.cart', bob);
+		const cart = await readCart(ctx.harper, BOB, bob);
 		strictEqual(cart.items.length, 0);
 	});
 
 	test('lets a customer keep using a cart they deleted', async () => {
-		await send(ctx.harper, 'DELETE', '/Cart/bob.cart', undefined, bob);
-		const result = await putCart(ctx.harper, 'bob.cart', [{ slug: IN_STOCK, quantity: 1 }], bob);
+		await send(ctx.harper, 'DELETE', cartPath(BOB), undefined, bob);
+		const result = await putCart(ctx.harper, BOB, [{ slug: IN_STOCK, quantity: 1 }], bob);
 		strictEqual(result.items.length, 1);
 	});
 
 	test("refuses to read another customer's cart", async () => {
-		await putCart(ctx.harper, 'ada.cart', [{ slug: IN_STOCK, quantity: 1 }], ada);
-		// 404 rather than 403: usernames are guessable, so a 403 would confirm which
+		await putCart(ctx.harper, ADA, [{ slug: IN_STOCK, quantity: 1 }], ada);
+		// 404 rather than 403: addresses are guessable, so a 403 would confirm which
 		// of them have carts.
-		strictEqual((await get(ctx.harper, '/Cart/ada.cart', bob)).status, 404);
+		strictEqual((await get(ctx.harper, cartPath(ADA), bob)).status, 404);
 	});
 
 	test("refuses to write another customer's cart", async () => {
-		const response = await send(ctx.harper, 'PUT', '/Cart/ada.cart', { items: [] }, bob);
+		const response = await send(ctx.harper, 'PUT', cartPath(ADA), { items: [] }, bob);
 		strictEqual(response.status, 404);
 
 		// And the victim's cart is untouched.
-		const cart = await readCart(ctx.harper, 'ada.cart', ada);
+		const cart = await readCart(ctx.harper, ADA, ada);
 		strictEqual(cart.items.length, 1);
 	});
 
 	test('refuses anonymous cart access outright', async () => {
-		const read = await get(ctx.harper, '/Cart/ada.cart');
+		const read = await get(ctx.harper, cartPath(ADA));
 		ok(read.status === 401 || read.status === 403, `expected a denial, got ${read.status}`);
 
-		const write = await send(ctx.harper, 'PUT', '/Cart/ada.cart', { items: [] });
+		const write = await send(ctx.harper, 'PUT', cartPath(ADA), { items: [] });
 		ok(write.status === 401 || write.status === 403, `expected a denial, got ${write.status}`);
 	});
 
 	test('keeps each customer their own cart', async () => {
-		await putCart(ctx.harper, 'ada.cart', [{ slug: IN_STOCK, quantity: 3 }], ada);
-		await putCart(ctx.harper, 'bob.cart', [{ slug: LOW_STOCK, quantity: 1 }], bob);
+		await putCart(ctx.harper, ADA, [{ slug: IN_STOCK, quantity: 3 }], ada);
+		await putCart(ctx.harper, BOB, [{ slug: LOW_STOCK, quantity: 1 }], bob);
 
-		strictEqual((await readCart(ctx.harper, 'ada.cart', ada)).items[0].slug, IN_STOCK);
-		strictEqual((await readCart(ctx.harper, 'bob.cart', bob)).items[0].slug, LOW_STOCK);
+		strictEqual((await readCart(ctx.harper, ADA, ada)).items[0].slug, IN_STOCK);
+		strictEqual((await readCart(ctx.harper, BOB, bob)).items[0].slug, LOW_STOCK);
 	});
 
 	test('survives a sign-out and sign-in with the cart intact', async () => {
-		// The cart is keyed by username, not by session, so it outlives the cookie.
-		await putCart(ctx.harper, 'ada.cart', [{ slug: IN_STOCK, quantity: 4 }], ada);
+		// The cart is keyed by the owner, not by the session, so it outlives the cookie.
+		await putCart(ctx.harper, ADA, [{ slug: IN_STOCK, quantity: 4 }], ada);
 		await post(ctx.harper, '/SignOut', undefined, ada);
 
 		const { cookie: fresh } = await post(ctx.harper, '/SignIn', {
-			username: 'ada.cart',
+			email: ADA,
 			password: 'correct-horse-battery',
 		});
-		const cart = await readCart(ctx.harper, 'ada.cart', fresh);
+		const cart = await readCart(ctx.harper, ADA, fresh);
 		strictEqual(cart.items[0].quantity, 4);
 		ada = fresh;
 	});

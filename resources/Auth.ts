@@ -20,7 +20,20 @@ import { CUSTOMER_ROLE, ensureRoles } from './lib/roles.ts';
  * endpoint and the method below does the real authorization.
  */
 
-const USERNAME_PATTERN = /^[a-zA-Z0-9._-]{3,32}$/;
+/**
+ * Accounts are identified by email address: the storefront's sign-up and sign-in
+ * forms ask for one, and it becomes the Harper username (the users table's
+ * primary key), so `AuthUser.username`, `Order.ownerUsername` and `/Cart/<id>`
+ * all carry an email from here on.
+ *
+ * The pattern is deliberately permissive — one `@`, a dotted domain, no spaces —
+ * because the only thing worth rejecting here is input that cannot be an address
+ * at all. A stricter regex reliably turns away real addresses, and the fully
+ * correct grammar (RFC 5322) is not a regex worth carrying. 254 is the maximum
+ * length an SMTP path can hold.
+ */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+const MAX_EMAIL_LENGTH = 254;
 const MIN_PASSWORD_LENGTH = 8;
 
 /**
@@ -31,14 +44,22 @@ function asRequestContext(context: unknown): Context {
 	return context as Context;
 }
 
-/** Validate credentials out of an untrusted body. */
-function readCredentials(body: unknown): { username: string; password: string } {
-	if (!body || typeof body !== 'object') badRequest('username and password are required');
-	const { username, password } = body as { username?: unknown; password?: unknown };
-	if (typeof username !== 'string' || typeof password !== 'string' || username.trim() === '' || password === '') {
-		badRequest('username and password are required');
+/**
+ * Validate credentials out of an untrusted body.
+ *
+ * The address is lower-cased as well as trimmed. Domains are case-insensitive
+ * and no mail provider treats the local part as case-sensitive in practice, so
+ * without this `Ada@example.com` registers as a second account that the owner of
+ * `ada@example.com` cannot tell apart — and, because the username is the users
+ * table's primary key, cannot be merged back afterwards.
+ */
+function readCredentials(body: unknown): { email: string; password: string } {
+	if (!body || typeof body !== 'object') badRequest('email and password are required');
+	const { email, password } = body as { email?: unknown; password?: unknown };
+	if (typeof email !== 'string' || typeof password !== 'string' || email.trim() === '' || password === '') {
+		badRequest('email and password are required');
 	}
-	return { username: username.trim(), password };
+	return { email: email.trim().toLowerCase(), password };
 }
 
 /** What the client is told about the signed-in user. */
@@ -65,10 +86,10 @@ export class SignUp extends Resource {
 	}
 
 	async post(data: unknown) {
-		const { username, password } = readCredentials(await data);
+		const { email, password } = readCredentials(await data);
 
-		if (!USERNAME_PATTERN.test(username)) {
-			badRequest('Username must be 3-32 characters using letters, numbers, dot, underscore or hyphen');
+		if (email.length > MAX_EMAIL_LENGTH || !EMAIL_PATTERN.test(email)) {
+			badRequest('Enter a valid email address');
 		}
 		if (password.length < MIN_PASSWORD_LENGTH) {
 			badRequest(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
@@ -78,7 +99,7 @@ export class SignUp extends Resource {
 			await server.operation(
 				{
 					operation: 'add_user',
-					username,
+					username: email,
 					password,
 					role: CUSTOMER_ROLE, // never from the request body — see the note above
 					active: true,
@@ -89,13 +110,13 @@ export class SignUp extends Resource {
 			// Harper answers 409 when the username is taken. Re-message that; let
 			// anything else propagate rather than masking a real failure.
 			if ((error as { statusCode?: number })?.statusCode === 409) {
-				conflict('That username is already taken');
+				conflict('An account already exists for that email address');
 			}
 			throw error;
 		}
 
-		await signIn(asRequestContext(this.getContext()), username, password);
-		return { username, role: CUSTOMER_ROLE };
+		await signIn(asRequestContext(this.getContext()), email, password);
+		return { username: email, role: CUSTOMER_ROLE };
 	}
 }
 
@@ -107,11 +128,14 @@ export class SignIn extends Resource {
 	}
 
 	async post(data: unknown) {
-		const { username, password } = readCredentials(await data);
-		await signIn(asRequestContext(this.getContext()), username, password);
+		// No format check: an account predating the move to email addresses should
+		// still be able to sign in, and the credentials are checked against the
+		// users table either way. Only registration decides what an account may be.
+		const { email, password } = readCredentials(await data);
+		await signIn(asRequestContext(this.getContext()), email, password);
 
 		const user = this.getCurrentUser();
-		return user ? describeUser(user) : { username };
+		return user ? describeUser(user) : { username: email };
 	}
 }
 
@@ -160,7 +184,7 @@ async function signIn(context: Context, username: string, password: string): Pro
 		await context.login(username, password);
 	} catch {
 		// Deliberately does not distinguish an unknown user from a wrong password.
-		forbidden('Invalid username or password');
+		forbidden('Invalid email or password');
 	}
 	await commitSession(context);
 }

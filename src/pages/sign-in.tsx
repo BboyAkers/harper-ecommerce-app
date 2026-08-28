@@ -7,6 +7,15 @@ import { type FormEvent, useEffect, useState } from 'react';
 
 type Mode = 'sign-in' | 'sign-up';
 
+/**
+ * Mirrors `EMAIL_PATTERN` in `resources/Auth.ts` — deliberately permissive, since
+ * the server is the one that decides. This exists to answer a typo immediately
+ * rather than after a round trip.
+ */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+
+const isEmail = (value: string) => value.length <= 254 && EMAIL_PATTERN.test(value);
+
 const COPY = {
 	'sign-in': {
 		heading: 'Sign In',
@@ -28,7 +37,7 @@ export function SignInPage() {
 	const navigate = useNavigate();
 	const { user, signIn, signUp } = useAuth();
 	const [mode, setMode] = useState<Mode>('sign-in');
-	const [username, setUsername] = useState('');
+	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [error, setError] = useState<string | undefined>();
 	const [pending, setPending] = useState(false);
@@ -40,13 +49,21 @@ export function SignInPage() {
 	}, [user, navigate]);
 
 	const copy = COPY[mode];
+	const address = email.trim();
 
 	async function submit(event: FormEvent) {
 		event.preventDefault();
+		// `noValidate` on the form turns off the browser's own bubble, so the email
+		// check has to happen here — and it has to happen before the request, or the
+		// only feedback on a typo is a 400 from the server.
+		if (!isEmail(address)) {
+			setError('Enter a valid email address.');
+			return;
+		}
 		setError(undefined);
 		setPending(true);
 		try {
-			await (mode === 'sign-in' ? signIn : signUp)({ username: username.trim(), password });
+			await (mode === 'sign-in' ? signIn : signUp)({ email: address, password });
 			navigate({ to: '/account' });
 		} catch (caught) {
 			setError(caught instanceof Error ? caught.message : 'Something went wrong. Please try again.');
@@ -68,14 +85,18 @@ export function SignInPage() {
 
 					<form onSubmit={submit} noValidate className="mt-8 space-y-6">
 						<div>
-							<Label htmlFor="username">Username</Label>
+							<Label htmlFor="email">Email</Label>
 							<div className="mt-2">
 								<Input
-									id="username"
-									value={username}
-									onChange={(event) => setUsername(event.target.value)}
-									placeholder="alexei.ward"
-									autoComplete="username"
+									id="email"
+									type="email"
+									value={email}
+									onChange={(event) => setEmail(event.target.value)}
+									placeholder="alexei.ward@example.com"
+									// `email`, not `username`: it is what the password manager
+									// needs to offer the right saved address.
+									autoComplete="email"
+									inputMode="email"
 									autoCapitalize="none"
 									spellCheck={false}
 									required
@@ -99,7 +120,7 @@ export function SignInPage() {
 
 						{error && <p className="text-body text-error">{error}</p>}
 
-						<Button type="submit" disabled={pending || !username.trim() || !password} className="w-full">
+						<Button type="submit" disabled={pending || !address || !password} className="w-full">
 							{pending ? copy.pending : copy.submit}
 						</Button>
 					</form>

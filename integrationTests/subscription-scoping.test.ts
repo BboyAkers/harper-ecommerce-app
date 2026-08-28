@@ -7,7 +7,7 @@
  * `search()` or `get()` — and the only authorization on that path is
  * `allowRead`. `Cart.allowRead()` returns true unconditionally and `Order`
  * inherits the role's table-level grant, so before the `subscribe()` overrides
- * these suites cover, `ws://…/Cart/<any-username>` streamed another customer's
+ * these suites cover, `ws://…/Cart/<anyone's email>` streamed another customer's
  * cart to an anonymous client.
  *
  * Runs with `authorizeLocal: false`; otherwise every request from this loopback
@@ -19,7 +19,7 @@ import { rm } from 'node:fs/promises';
 import { after, before, suite, test } from 'node:test';
 import WebSocket from 'ws';
 import { restUrl, startAppHarper, VALID_CUSTOMER } from './helpers/app-fixture.ts';
-import { get, post, register } from './helpers/session.ts';
+import { cartPath, get, post, register } from './helpers/session.ts';
 
 /** What happened when we tried to subscribe. */
 interface SubscribeAttempt {
@@ -72,6 +72,8 @@ function trySubscribe(harper: HarperContext, path: string, cookie?: string, ms =
 
 suite('subscription scoping', (ctx: ContextWithHarper) => {
 	let fixtureDir: string;
+	const ALICE = 'alice.live@example.com';
+	const BOB = 'bob.live@example.com';
 	let aliceCookie: string | undefined;
 	let bobCookie: string | undefined;
 	let aliceOrderId: string;
@@ -81,11 +83,11 @@ suite('subscription scoping', (ctx: ContextWithHarper) => {
 			config: { authentication: { authorizeLocal: false } },
 		}));
 
-		aliceCookie = await register(ctx.harper, 'alice.live');
-		bobCookie = await register(ctx.harper, 'bob.live');
+		aliceCookie = await register(ctx.harper, ALICE);
+		bobCookie = await register(ctx.harper, BOB);
 
 		// Give Alice a cart and an order to be leaked.
-		const cart = await fetch(restUrl(ctx.harper, '/Cart/alice.live'), {
+		const cart = await fetch(restUrl(ctx.harper, cartPath(ALICE)), {
 			method: 'PUT',
 			headers: { 'Content-Type': 'application/json', Accept: 'application/json', Cookie: aliceCookie! },
 			body: JSON.stringify({ items: [{ slug: 'yx1-earphones', quantity: 1 }] }),
@@ -113,17 +115,17 @@ suite('subscription scoping', (ctx: ContextWithHarper) => {
 	});
 
 	test('refuses an anonymous subscription to a customer cart', async () => {
-		const attempt = await trySubscribe(ctx.harper, '/Cart/alice.live');
+		const attempt = await trySubscribe(ctx.harper, cartPath(ALICE));
 		strictEqual(attempt.delivered, false, `anonymous cart subscription leaked: ${attempt.frame}`);
 	});
 
 	test('refuses another customer a subscription to a cart that is not theirs', async () => {
-		const attempt = await trySubscribe(ctx.harper, '/Cart/alice.live', bobCookie);
+		const attempt = await trySubscribe(ctx.harper, cartPath(ALICE), bobCookie);
 		strictEqual(attempt.delivered, false, `cross-customer cart subscription leaked: ${attempt.frame}`);
 	});
 
 	test('lets a customer subscribe to their own cart', async () => {
-		const attempt = await trySubscribe(ctx.harper, '/Cart/alice.live', aliceCookie);
+		const attempt = await trySubscribe(ctx.harper, cartPath(ALICE), aliceCookie);
 		ok(attempt.delivered, `owner was refused their own cart: close=${attempt.closeCode} error=${attempt.error}`);
 	});
 

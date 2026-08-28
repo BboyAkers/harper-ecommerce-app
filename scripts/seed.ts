@@ -11,11 +11,11 @@
  *   - **Orders** must be *placed*, not inserted. `Order.post` prices every line from
  *     the catalog, computes VAT and shipping, and draws stock down. An order written
  *     around that would carry totals nothing in the app agrees with.
- *   - **Carts** are keyed by username, so they cannot exist before their owner does.
+ *   - **Carts** are keyed by the owner's email, so they cannot exist before their owner does.
  *
  * So this script drives the app's own HTTP endpoints, exactly as the storefront
  * does. That is the point as much as the convenience: seeding through `/SignUp`,
- * `/Order` and `/Cart/<username>` exercises the real validation, pricing and
+ * `/Order` and `/Cart/<email>` exercises the real validation, pricing and
  * inventory paths, and a seed run that succeeds is a smoke test of all three.
  *
  * Re-running is safe. Every step checks before it writes.
@@ -53,7 +53,7 @@ const ADMIN_PASSWORD = process.env.HARPER_ADMIN_PASSWORD;
  */
 const PASSWORD = process.env.SEED_PASSWORD ?? 'correct-horse-battery';
 
-const EDITOR_USERNAME = 'editor.demo';
+const EDITOR_EMAIL = 'editor@example.com';
 
 /**
  * How long to wait for the catalog before giving up.
@@ -71,7 +71,13 @@ interface SeedOrder {
 }
 
 interface SeedShopper {
-	username: string;
+	/**
+	 * The account's email address, which `/SignUp` stores as the Harper username —
+	 * so it is also the primary key of this shopper's cart. Kept equal to
+	 * `customer.email` below: an order placed by this account should not claim a
+	 * different address than the one it signs in with.
+	 */
+	email: string;
 	customer: OrderCustomer;
 	/** Placed in order, so the account page has a history rather than one row. */
 	orders: SeedOrder[];
@@ -90,7 +96,7 @@ interface SeedShopper {
  */
 const SHOPPERS: SeedShopper[] = [
 	{
-		username: 'ada.lovelace',
+		email: 'ada@example.com',
 		customer: {
 			name: 'Ada Lovelace',
 			email: 'ada@example.com',
@@ -113,7 +119,7 @@ const SHOPPERS: SeedShopper[] = [
 		],
 	},
 	{
-		username: 'grace.hopper',
+		email: 'grace@example.com',
 		customer: {
 			name: 'Grace Hopper',
 			email: 'grace@example.com',
@@ -246,29 +252,29 @@ async function waitForCatalog(expected: number): Promise<Product[]> {
 }
 
 /** Create the shopper if absent, then sign in. Returns the session cookie. */
-async function ensureShopper(username: string): Promise<string> {
-	const created = await request('POST', '/SignUp', { body: { username, password: PASSWORD } });
+async function ensureShopper(email: string): Promise<string> {
+	const created = await request('POST', '/SignUp', { body: { email, password: PASSWORD } });
 	if (created.ok) {
 		const cookie = sessionCookie(created);
-		if (!cookie) throw new SeedError(`signed ${username} up but got no session cookie back`);
-		done(`created ${username}`);
+		if (!cookie) throw new SeedError(`signed ${email} up but got no session cookie back`);
+		done(`created ${email}`);
 		return cookie;
 	}
-	// 409 is the documented "username is already taken", i.e. a previous seed run.
+	// 409 is the documented "an account already exists", i.e. a previous seed run.
 	if (created.status !== 409) {
-		throw new SeedError(`could not create ${username} — ${await describeFailure(created)}`);
+		throw new SeedError(`could not create ${email} — ${await describeFailure(created)}`);
 	}
 
-	const signedIn = await request('POST', '/SignIn', { body: { username, password: PASSWORD } });
+	const signedIn = await request('POST', '/SignIn', { body: { email, password: PASSWORD } });
 	if (!signedIn.ok) {
 		throw new SeedError(
-			`${username} already exists but the seed password does not work — ${await describeFailure(signedIn)}.\n` +
+			`${email} already exists but the seed password does not work — ${await describeFailure(signedIn)}.\n` +
 				`  Set SEED_PASSWORD to the password it was created with, or drop the user.`,
 		);
 	}
 	const cookie = sessionCookie(signedIn);
-	if (!cookie) throw new SeedError(`signed ${username} in but got no session cookie back`);
-	skip(`${username} already exists`);
+	if (!cookie) throw new SeedError(`signed ${email} in but got no session cookie back`);
+	skip(`${email} already exists`);
 	return cookie;
 }
 
@@ -283,10 +289,10 @@ async function ensureShopper(username: string): Promise<string> {
 async function seedOrders(shopper: SeedShopper, cookie: string): Promise<void> {
 	const existing = await request('GET', '/Order/', { cookie });
 	if (!existing.ok)
-		throw new SeedError(`could not read ${shopper.username}'s orders — ${await describeFailure(existing)}`);
+		throw new SeedError(`could not read ${shopper.email}'s orders — ${await describeFailure(existing)}`);
 	const orders = (await existing.json()) as unknown[];
 	if (orders.length > 0) {
-		skip(`${shopper.username} already has ${orders.length} order(s)`);
+		skip(`${shopper.email} already has ${orders.length} order(s)`);
 		return;
 	}
 
@@ -301,7 +307,7 @@ async function seedOrders(shopper: SeedShopper, cookie: string): Promise<void> {
 			cookie,
 		});
 		if (!response.ok) {
-			throw new SeedError(`could not place an order for ${shopper.username} — ${await describeFailure(response)}`);
+			throw new SeedError(`could not place an order for ${shopper.email} — ${await describeFailure(response)}`);
 		}
 		const placed = (await response.json()) as { grandTotal?: number };
 		const lines = order.items.map((item) => `${item.quantity}x ${item.slug}`).join(', ');
@@ -309,14 +315,17 @@ async function seedOrders(shopper: SeedShopper, cookie: string): Promise<void> {
 	}
 }
 
-/** Store a saved cart. `PUT /Cart/<username>` replaces the whole cart, so this is naturally idempotent. */
+/** Store a saved cart. `PUT /Cart/<email>` replaces the whole cart, so this is naturally idempotent. */
 async function seedCart(shopper: SeedShopper, cookie: string): Promise<void> {
 	if (!shopper.cart) return;
-	const response = await request('PUT', `/Cart/${shopper.username}`, { body: { items: shopper.cart }, cookie });
+	const response = await request('PUT', `/Cart/${encodeURIComponent(shopper.email)}`, {
+		body: { items: shopper.cart },
+		cookie,
+	});
 	if (!response.ok) {
-		throw new SeedError(`could not save ${shopper.username}'s cart — ${await describeFailure(response)}`);
+		throw new SeedError(`could not save ${shopper.email}'s cart — ${await describeFailure(response)}`);
 	}
-	done(`saved a ${shopper.cart.length}-line cart for ${shopper.username}`);
+	done(`saved a ${shopper.cart.length}-line cart for ${shopper.email}`);
 }
 
 /**
@@ -328,18 +337,18 @@ async function seedCart(shopper: SeedShopper, cookie: string): Promise<void> {
  */
 async function ensureEditor(): Promise<void> {
 	const users = await operation<{ username: string }[]>({ operation: 'list_users' });
-	if (users.some((user) => user.username === EDITOR_USERNAME)) {
-		skip(`${EDITOR_USERNAME} already exists`);
+	if (users.some((user) => user.username === EDITOR_EMAIL)) {
+		skip(`${EDITOR_EMAIL} already exists`);
 		return;
 	}
 	await operation({
 		operation: 'add_user',
-		username: EDITOR_USERNAME,
+		username: EDITOR_EMAIL,
 		password: PASSWORD,
 		role: 'editor',
 		active: true,
 	});
-	done(`created ${EDITOR_USERNAME} with the editor role`);
+	done(`created ${EDITOR_EMAIL} with the editor role`);
 }
 
 /**
@@ -415,8 +424,8 @@ async function main(): Promise<void> {
 	}
 
 	for (const shopper of SHOPPERS) {
-		step(`Shopper — ${shopper.username}`);
-		const cookie = await ensureShopper(shopper.username);
+		step(`Shopper — ${shopper.email}`);
+		const cookie = await ensureShopper(shopper.email);
 		await seedOrders(shopper, cookie);
 		await seedCart(shopper, cookie);
 	}
@@ -429,8 +438,8 @@ async function main(): Promise<void> {
 	reportCatalog(await waitForCatalog(declared.length));
 
 	step('Done. Sign in at the storefront with:');
-	for (const shopper of SHOPPERS) say(`  ${shopper.username.padEnd(14)} / ${PASSWORD}`);
-	if (hasAdmin) say(`  ${EDITOR_USERNAME.padEnd(14)} / ${PASSWORD}`);
+	for (const shopper of SHOPPERS) say(`  ${shopper.email.padEnd(20)} / ${PASSWORD}`);
+	if (hasAdmin) say(`  ${EDITOR_EMAIL.padEnd(20)} / ${PASSWORD}`);
 	say('');
 }
 

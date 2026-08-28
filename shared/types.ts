@@ -121,7 +121,16 @@ export interface AuthUser {
 	role?: string;
 }
 
+/**
+ * What the sign-in and sign-up forms submit.
+ *
+ * The field is `email`, not `username`: an account is identified by its email
+ * address, and `resources/Auth.ts` stores that address *as* the Harper username.
+ * So `AuthUser.username` above is the same string read back — the name stays
+ * because it is Harper's users-table key, not because there is a second
+ * identifier.
+ */
 export interface Credentials {
-	username: string;
+	email: string;
 	password: string;
 }

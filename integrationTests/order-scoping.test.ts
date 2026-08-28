@@ -58,8 +58,8 @@ suite('order scoping', (ctx: ContextWithHarper) => {
 			config: { authentication: { authorizeLocal: false } },
 		}));
 
-		aliceCookie = await register(ctx.harper, 'alice.shopper');
-		bobCookie = await register(ctx.harper, 'bob.shopper');
+		aliceCookie = await register(ctx.harper, 'alice.shopper@example.com');
+		bobCookie = await register(ctx.harper, 'bob.shopper@example.com');
 
 		aliceOrder = await placeOrder(ctx.harper, aliceCookie);
 		bobOrder = await placeOrder(ctx.harper, bobCookie);
@@ -89,7 +89,7 @@ suite('order scoping', (ctx: ContextWithHarper) => {
 	test('a condition naming another customer returns nothing', async () => {
 		// The filter is applied during execution, so it cannot be argued away by
 		// crafting conditions the way an appended `ownerUsername` term could be.
-		const response = await get(ctx.harper, '/Order/?ownerUsername=alice.shopper&select(id)', bobCookie);
+		const response = await get(ctx.harper, '/Order/?ownerUsername=alice.shopper@example.com&select(id)', bobCookie);
 		strictEqual(response.status, 200);
 		strictEqual(((await response.json()) as unknown[]).length, 0);
 	});
@@ -105,7 +105,7 @@ suite('order scoping', (ctx: ContextWithHarper) => {
 		strictEqual(response.status, 200);
 		const order = (await response.json()) as OrderSummary;
 		strictEqual(order.id, bobOrder.id);
-		strictEqual(order.ownerUsername, 'bob.shopper');
+		strictEqual(order.ownerUsername, 'bob.shopper@example.com');
 	});
 
 	test('never surfaces guest orders to a signed-in customer', async () => {
@@ -138,7 +138,7 @@ suite('order scoping', (ctx: ContextWithHarper) => {
 	});
 
 	test('keeps a signed-out session from reading the orders it just placed', async () => {
-		const cookie = await register(ctx.harper, 'carol.shopper');
+		const cookie = await register(ctx.harper, 'carol.shopper@example.com');
 		await placeOrder(ctx.harper, cookie);
 		strictEqual((await listOrders(ctx.harper, cookie)).length, 1);
 
